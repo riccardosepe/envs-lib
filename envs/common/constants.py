@@ -1,0 +1,3 @@
+EMPTY_CELL = 0
+WHITE = 1
+BLACK = 2
