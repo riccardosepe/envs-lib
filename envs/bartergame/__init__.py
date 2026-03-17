@@ -1,1 +1,1 @@
-from .barter_game_env import BarterGameEnv
+from .bartergame_env import BarterGameEnv

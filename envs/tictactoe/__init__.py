@@ -1,1 +1,1 @@
-from .tic_tac_toe_env import TicTacToeEnv
+from .tictactoe_env import TicTacToeEnv

@@ -1,1 +1,1 @@
-from .towers_of_hanoi_env import TowersOfHanoiEnv
+from .hanoitowers_env import TowersOfHanoiEnv

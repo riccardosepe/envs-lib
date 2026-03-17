@@ -1,1 +1,1 @@
-from .sail_domain_env import SailDomainEnv
+from .sailingdomain_env import SailingDomainEnv

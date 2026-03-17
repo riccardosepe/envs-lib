@@ -1,1 +1,1 @@
-from .block_stack_env import BlockStackEnv
+from .blockstack_env import BlockStackEnv

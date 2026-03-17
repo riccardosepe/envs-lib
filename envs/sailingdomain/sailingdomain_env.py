@@ -84,7 +84,7 @@ maps = {
     ],
 }
 
-class SailDomainEnv(Env, BaseEnv):
+class SailingDomainEnv(Env, BaseEnv):
     metadata = {
         "render_modes": ["human", "ansi"],
         "render_fps": 4,
@@ -518,7 +518,7 @@ if __name__ == '__main__':
         pygame.K_DOWN: 2,
     }
 
-    env = SailDomainEnv(
+    env = SailingDomainEnv(
         render_mode='human',
         map_name='map_2',
     )

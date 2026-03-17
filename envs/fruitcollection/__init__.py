@@ -1,1 +1,1 @@
-from .fruit_collection_env import FruitCollectionEnv
+from .fruitcollection_env import FruitCollectionEnv

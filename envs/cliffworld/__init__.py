@@ -1,1 +1,1 @@
-from .cliffworld import CliffWorldEnv
+from .cliffworld_env import CliffWorldEnv
