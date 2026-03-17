@@ -4,7 +4,7 @@ from gymnasium import Env
 import numpy as np
 from gymnasium.spaces import Discrete, Box
 
-from envs.common import BaseEnv
+from ..common import BaseEnv
 
 
 class TowersOfHanoiEnv(BaseEnv, Env):

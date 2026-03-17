@@ -8,8 +8,8 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from envs.common import BaseEnv
-from envs.common.constants import EMPTY_CELL, WHITE, BLACK
+from ..common import BaseEnv
+from ..common.constants import EMPTY_CELL, WHITE, BLACK
 
 
 def render_latex(text, color=(0, 0, 0), font_size=22):

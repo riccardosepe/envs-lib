@@ -1,6 +1,6 @@
 from gymnasium import Env, spaces
 
-from envs.common import BaseEnv
+from ..common import BaseEnv
 
 
 class BlockStackEnv(Env, BaseEnv):

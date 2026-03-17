@@ -5,7 +5,7 @@ and some obstacles and treasures in between. Additionally, the wind is flowing f
 the agent can only move right, up-right, or down-right.
 An episode ends when the agent reaches the goal or after it hits an obstacle. There is no timestep limit because
 the wind will eventually push the agent to the goal or to an obstacle.
-The environment subclasses Env from gymnasium and BaseEnv from envs.common.base_env.
+The environment subclasses Env from gymnasium and BaseEnv from ..common.base_env.
 The environment defines the action space, observation space, reset, step, render methods, and other necessary properties.
 The reward structure is as follows:
 - Reaching the goal: +1
@@ -22,7 +22,7 @@ import numpy as np
 from gymnasium import spaces, Env, utils
 from gymnasium.error import DependencyNotInstalled
 
-from envs.common import BaseEnv
+from ..common import BaseEnv
 
 maps = {
     "base": [

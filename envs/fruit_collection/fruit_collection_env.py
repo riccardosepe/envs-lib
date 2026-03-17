@@ -7,7 +7,7 @@ from gymnasium import Env
 from gymnasium.envs.registration import EnvSpec
 from gymnasium.error import DependencyNotInstalled
 
-from envs.common.base_env import BaseEnv
+from ..common.base_env import BaseEnv
 
 MAPS = {
     "base": [

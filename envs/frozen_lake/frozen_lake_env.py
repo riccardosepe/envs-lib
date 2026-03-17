@@ -6,7 +6,7 @@ import numpy as np
 from gymnasium.envs.toy_text import FrozenLakeEnv as GymFrozenLakeEnv
 from gymnasium.error import DependencyNotInstalled
 
-from envs.common import BaseEnv
+from ..common import BaseEnv
 
 LEFT = 0
 DOWN = 1

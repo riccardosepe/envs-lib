@@ -6,8 +6,8 @@ import numpy as np
 import pygame
 from gymnasium import Env, spaces
 
-from envs.common.constants import *
-from envs.common import BaseEnv
+from ..common.constants import *
+from ..common import BaseEnv
 
 
 class BreakthroughException(Exception):
