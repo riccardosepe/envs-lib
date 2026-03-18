@@ -1,10 +1,8 @@
-import io
 from copy import deepcopy
 
 import numpy as np
 from gymnasium import Env
 from gymnasium.spaces import Discrete
-from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
