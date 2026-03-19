@@ -120,6 +120,25 @@ class BaseEnv(ABC):
     def game_result(self, **kwargs):
         pass
 
+    # ------------------------------------------------------------------
+    # Input label hook
+    # ------------------------------------------------------------------
+
+    def decode_action_input(self, action) -> str:
+        """
+        Return the string a human should type to select this action.
+
+        Defaults to decode_action_human(), which is correct for most envs.
+        Override when the display label carries extra information that
+        would be tedious to retype (e.g. Connect4 shows "A3" for display
+        but only needs "A" for input, since the landing row is determined
+        by the current board state and is not part of the move itself).
+
+        Must be consistent with get_user_action()'s matching logic: the
+        returned string is compared case-insensitively against raw input.
+        """
+        return self.decode_action_human(action)
+
     @abstractmethod
     def reward(self):
         """
@@ -141,7 +160,7 @@ class BaseEnv(ABC):
     # ------------------------------------------------------------------
 
     @classmethod
-    def build_checkpoint(cls, checkpoint_id: int):
+    def load_checkpoint(cls, checkpoint_id: int):
         """
         Load a previously saved game state by its integer ID.
 
@@ -244,3 +263,6 @@ class BaseEnv(ABC):
         single-agent envs always return 'Agent'.
         """
         return 'Agent'
+
+    def decode_action_human(self, action):
+        return NotImplementedError

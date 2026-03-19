@@ -354,6 +354,10 @@ class Connect4Env(Env, BaseEnv):
         col_char = chr(ord('A') + action)
         return f"{col_char}{row}"
 
+    def decode_action_input(self, action) -> str:
+        """Column letter only — the landing row is implied by board state."""
+        return chr(ord('A') + action)
+
     # ------------------------------------------------------------------
     # Rendering
     # ------------------------------------------------------------------
