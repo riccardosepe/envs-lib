@@ -6,25 +6,29 @@ import numpy as np
 import pygame
 from gymnasium import Env, spaces
 
-from ..common.constants import *
 from ..common import BaseEnv
+from ..common.constants import *
 
 
 class BreakthroughException(Exception):
     def __init__(self, message="Generic Breakthrough exception."):
         super().__init__(message)
 
+
 class InvalidPieceSelectionException(BreakthroughException):
     def __init__(self, message="You can't select this piece."):
         super().__init__(message)
+
 
 class InvalidActionException(BreakthroughException):
     def __init__(self, message="You can't select this destination square."):
         super().__init__(message)
 
+
 class IllegalActionException(BreakthroughException):
     def __init__(self, message="This action is illegal."):
         super().__init__(message)
+
 
 class BreakthroughEnv(BaseEnv, Env):
     metadata = {
@@ -239,11 +243,9 @@ class BreakthroughEnv(BaseEnv, Env):
         human_first = kwargs['human_first']
 
         if human_first:
-            # Human is white
             self.human_color = WHITE
             self.agent_color = BLACK
         else:
-            # Human is black
             self.human_color = BLACK
             self.agent_color = WHITE
 
@@ -268,7 +270,6 @@ class BreakthroughEnv(BaseEnv, Env):
         self.window_surface = None
         self.clock = None
         self.selected = None
-
 
     def _encode_action(self, i, j, direction):
         """
@@ -299,7 +300,6 @@ class BreakthroughEnv(BaseEnv, Env):
         """
         row_name = self.nrow - i
         col_name = chr(ord('a') + j)
-
         return f"{col_name}{row_name}"
 
     def decode_action_human(self, action, lan=True, check_validity=True, player=None):
@@ -329,7 +329,7 @@ class BreakthroughEnv(BaseEnv, Env):
             piece_id = self.get_piece_id_from_pos(i, j)
             piece_direction = self.get_direction(direction)
             piece_color = self.board[i, j]
-            return f"{BreakthroughEnv.ANSI_PIECES[piece_color]}{piece_id+1} {piece_direction}"
+            return f"{BreakthroughEnv.ANSI_PIECES[piece_color]}{piece_id + 1} {piece_direction}"
 
     def _legal_position(self, i, j):
         return 0 <= i < self.nrow and 0 <= j < self.ncol
@@ -351,7 +351,7 @@ class BreakthroughEnv(BaseEnv, Env):
 
         return ii, jj
 
-    def step(self, action) :
+    def step(self, action):
         if not self.action_space.contains(action):
             raise IllegalActionException
 
@@ -365,7 +365,6 @@ class BreakthroughEnv(BaseEnv, Env):
 
         self._la_lan = self.decode_action_human((i, j, ii, jj))
 
-        # handle the possibility to eat
         if dest_cell == self.current_player:
             raise InvalidActionException(f"Player {'WHITE' if self.current_player==WHITE else 'BLACK'} cannot move piece from ({i}, {j}) to ({ii}, {jj}) because the destination cell is occupied by another piece of the same color.")
 
@@ -379,15 +378,12 @@ class BreakthroughEnv(BaseEnv, Env):
                 assert captured_id is not None
                 self._pieces_positions[self.other_player][captured_id] = None
 
-        # update the dictionaries
         moved_piece_id = self.get_piece_id_from_pos(i, j)
         self._pieces_positions[self.current_player][moved_piece_id] = (ii, jj)
 
-        # update the board
         self.board[i, j] = EMPTY_CELL
         self.board[ii, jj] = self.current_player
 
-        # check for the game to be over
         if self.current_player == WHITE and ii == 0:
             self._done = WHITE
         elif self.current_player == BLACK and ii == self.nrow - 1:
@@ -397,7 +393,6 @@ class BreakthroughEnv(BaseEnv, Env):
         elif len(list(filter(lambda p: p is not None, self._pieces_positions[BLACK].values()))) == 0:
             self._done = WHITE
 
-        # change turn
         self.current_player = self.other_player
 
         self.t += 1
@@ -485,9 +480,9 @@ class BreakthroughEnv(BaseEnv, Env):
             if mode == "human":
                 pygame.display.init()
                 pygame.display.set_caption("Breakthrough")
-                # Add space for index column, row, and top status bar
                 self.window_surface = pygame.display.set_mode(
-                    (self.window_size[0] + self.index_width, self.window_size[1] + self.index_width + self.status_bar_height)
+                    (self.window_size[0] + self.index_width,
+                     self.window_size[1] + self.index_width + self.status_bar_height)
                 )
 
         assert self.window_surface is not None, "Pygame window surface creation failed."
@@ -502,7 +497,6 @@ class BreakthroughEnv(BaseEnv, Env):
         else:
             board = self.flipped_board
 
-        # Draw board with offset for index column/row and status bar
         for row in range(self.nrow):
             for col in range(self.ncol):
                 pos = (
@@ -557,14 +551,12 @@ class BreakthroughEnv(BaseEnv, Env):
             col_labels = [chr(ord('A') + i) for i in range(self.ncol)][::-1]
             row_labels = list(range(1, self.nrow + 1))
 
-        # Column indices (letters)
         for col, label in zip(range(self.ncol), col_labels):
             text_surface = col_font.render(label, True, (255, 255, 255))
             x = self.index_width + col * self.cell_size[0] + self.cell_size[0] // 2 - text_surface.get_width() // 2
             y = self.status_bar_height + self.nrow * self.cell_size[1] + (self.index_width // 2 - text_surface.get_height() // 2)
             self.window_surface.blit(text_surface, (x, y))
 
-        # Row indices (numbers)
         row_font = pygame.font.SysFont("arial", self._font_size, bold=True)
         for row, label in zip(range(self.nrow), row_labels):
             text_surface = row_font.render(str(label), True, (255, 255, 255))
@@ -572,7 +564,6 @@ class BreakthroughEnv(BaseEnv, Env):
             y = self.status_bar_height + row * self.cell_size[1] + self.cell_size[1] // 2 - text_surface.get_height() // 2
             self.window_surface.blit(text_surface, (x, y))
 
-        # Status bar at the top
         status_font = pygame.font.SysFont("Apple Symbols", 25)
         status_bar_rect = pygame.Rect(
             0,
@@ -582,14 +573,11 @@ class BreakthroughEnv(BaseEnv, Env):
         )
         pygame.draw.rect(self.window_surface, (240, 240, 240), status_bar_rect)
 
-        # Count pieces
         white_count = sum(cell == WHITE for row in board for cell in row)
         black_count = sum(cell == BLACK for row in board for cell in row)
 
-        # Get turn count (assuming you track it)
         turn_count = self.t
 
-        # Prepare status text
         if self.selected:
             r, c = self.selected
             if self.human_color == WHITE:
@@ -614,7 +602,7 @@ class BreakthroughEnv(BaseEnv, Env):
 
     def get_square_under_mouse(self, pos):
         j, i = pos
-        return (i-self.status_bar_height) // self.cell_size[1], (j-self.index_width) // self.cell_size[0]
+        return (i - self.status_bar_height) // self.cell_size[1], (j - self.index_width) // self.cell_size[0]
 
     def get_mouse_action(self):
         if self.human_color == WHITE:
@@ -631,26 +619,24 @@ class BreakthroughEnv(BaseEnv, Env):
                     selected_row, selected_col = self.selected
                     piece = board[selected_row][selected_col]
                     if (
-                            selected_row == row  # impossible to move on the same row
-                            or (piece == self.human_color and row != selected_row - 1)  # only possible to move one cell vertically
-                            or (piece == self.agent_color and row != selected_row + 1)  # only possible to move one cell vertically
-                            or col not in [selected_col - 1, selected_col, selected_col + 1]  # illegal horizontal destination square
-                            or not (0 <= col <= self.ncol - 1)  # illegal horizontal destination square
-                            or piece == board[row][col]  # impossible to move if there's another piece of the same color
+                            selected_row == row
+                            or (piece == self.human_color and row != selected_row - 1)
+                            or (piece == self.agent_color and row != selected_row + 1)
+                            or col not in [selected_col - 1, selected_col, selected_col + 1]
+                            or not (0 <= col <= self.ncol - 1)
+                            or piece == board[row][col]
                     ):
                         self.selected = None
                         self.render()
                         return None
 
-                    # if we make it here, the move is legal
                     jj = col - selected_col + 1
                     direction = self.DIRECTIONS[jj]
                     self.selected = None
                     if self.human_color == BLACK:
-                        # i.e. if the board is flipped
                         selected_row = self.nrow - 1 - selected_row
                         selected_col = self.ncol - 1 - selected_col
-                        direction = self.DIRECTIONS[-(1+jj)]
+                        direction = self.DIRECTIONS[-(1 + jj)]
 
                     return self._encode_action(selected_row, selected_col, direction)
 
@@ -688,11 +674,6 @@ def console_main():
     done = False
     while not done:
         action = input('Action: ')
-        # ps = action.split(' ')
-        # i = int(ps[0])
-        # j = int(ps[1])
-        # direction = ps[2]
-        # action = env._encode_action(i, j, direction)
         action = int(action)
         obs, rew, done, _, _ = env.step(action)
         env.render()
