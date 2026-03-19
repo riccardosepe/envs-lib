@@ -8,10 +8,10 @@ the wind will eventually push the agent to the goal or to an obstacle.
 The environment subclasses Env from gymnasium and BaseEnv from ..common.base_env.
 The environment defines the action space, observation space, reset, step, render methods, and other necessary properties.
 The reward structure is as follows:
-- Reaching the goal: +1
-- Collecting a treasure of type A: +0.2
+- Reaching the goal: +0.4
+- Collecting a treasure of type A: +0.3
 - Collecting a treasure of type B: +0.1
-- Hitting an obstacle: -1
+- Hitting an obstacle: -0.1
 - Any other move: 0
 """
 from contextlib import closing
