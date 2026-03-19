@@ -239,15 +239,11 @@ class BreakthroughEnv(BaseEnv, Env):
         if 'seed' in kwargs:
             super(BreakthroughEnv, self).reset(seed=kwargs['seed'])
 
-        assert 'human_first' in kwargs
-        human_first = kwargs['human_first']
+        assert 'agent_color' in kwargs
+        agent_color = kwargs['agent_color']
 
-        if human_first:
-            self.human_color = WHITE
-            self.agent_color = BLACK
-        else:
-            self.human_color = BLACK
-            self.agent_color = WHITE
+        self.agent_color = agent_color
+        self.human_color = self.opponent_color(agent_color)
 
         self.board = np.zeros((self.nrow, self.ncol), dtype=np.uint8)
         self.board[0:2, :] = BLACK
@@ -660,7 +656,7 @@ class BreakthroughEnv(BaseEnv, Env):
 
 def human_main():
     env = BreakthroughEnv(render_mode="human")
-    env.reset(human_first=False)
+    env.reset(agent_color=BLACK)
     env.render()
 
     done = False
@@ -680,7 +676,7 @@ def human_main():
 
 def console_main():
     env = BreakthroughEnv(render_mode="human")
-    env.reset(human_first=True)
+    env.reset(agent_color=WHITE)
     env.render()
 
     done = False
