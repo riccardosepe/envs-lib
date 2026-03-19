@@ -6,7 +6,8 @@ the agent can only move right, up-right, or down-right.
 An episode ends when the agent reaches the goal or after it hits an obstacle. There is no timestep limit because
 the wind will eventually push the agent to the goal or to an obstacle.
 The environment subclasses Env from gymnasium and BaseEnv from ..common.base_env.
-The environment defines the action space, observation space, reset, step, render methods, and other necessary properties.
+The environment defines the action space, observation space, reset, step, render methods, and other necessary
+properties.
 The reward structure is as follows:
 - Reaching the goal: +0.4
 - Collecting a treasure of type A: +0.3
@@ -40,11 +41,11 @@ maps = {
         "...A......",
     ],
     "map_1": [
-    "..B.B.B...",
-    "..........",
-    "S.A......G",
-    "...B......",
-    "..........",
+        "..B.B.B...",
+        "..........",
+        "S.A......G",
+        "...B......",
+        "..........",
     ],
     "map_2": [
         "..BBBBBB..",
@@ -83,6 +84,7 @@ maps = {
         "..........",
     ],
 }
+
 
 class SailingDomainEnv(Env, BaseEnv):
     metadata = {
@@ -186,7 +188,6 @@ class SailingDomainEnv(Env, BaseEnv):
         self._taken_treasures = dict.fromkeys(self.treasures_a | self.treasures_b, False)
         return self.observation(), {}
 
-
     def observation(self, integer=False):
         if integer:
             return self.state[0] * self.cols + self.state[1]
@@ -198,7 +199,7 @@ class SailingDomainEnv(Env, BaseEnv):
             raise RuntimeError("Episode is done. Call reset() to start a new episode.")
 
         dy = self.actions[self._act_id_to_action[action]]
-        dx = 1  #  the wind always pushes right
+        dx = 1  # the wind always pushes right
         new_row = max(0, min(self.rows - 1, self.state[0] + dy))
         new_col = min(self.cols - 1, self.state[1] + dx)
         new_pos = (new_row, new_col)
@@ -289,11 +290,11 @@ class SailingDomainEnv(Env, BaseEnv):
             )
         else:
             return {
-                'reached_goal':    reached_goal,
-                'n_treasures_a':   n_a,
-                'n_treasures_b':   n_b,
+                'reached_goal': reached_goal,
+                'n_treasures_a': n_a,
+                'n_treasures_b': n_b,
                 'terminal_reward': r[3],
-                'obstacle_hit':    r[0] < 0,
+                'obstacle_hit': r[0] < 0,
             }
 
     def backup(self):
@@ -304,7 +305,7 @@ class SailingDomainEnv(Env, BaseEnv):
         """
         state = super().backup()
         state.update({
-            'state':           self.state,
+            'state': self.state,
             'taken_treasures': self._taken_treasures.copy(),
         })
         return state
@@ -482,7 +483,7 @@ class SailingDomainEnv(Env, BaseEnv):
         if self.boat_img is None:
             file_name = path.join(path.dirname(__file__), "img/boat.png")
             self.boat_img = pygame.transform.scale(
-                pygame.image.load(file_name), ((self.cell_size[0] // 4)*3, (self.cell_size[1] // 4)*3)
+                pygame.image.load(file_name), ((self.cell_size[0] // 4) * 3, (self.cell_size[1] // 4) * 3)
             )
         if self.chest_A_img is None:
             file_name = path.join(path.dirname(__file__), "img/chest_1.png")
@@ -517,7 +518,7 @@ class SailingDomainEnv(Env, BaseEnv):
                 pos = (x * self.cell_size[0], y * self.cell_size[1])
                 rect = (*pos, *self.cell_size)
 
-                self.window_surface.blit(self.water_img[x%3], pos)
+                self.window_surface.blit(self.water_img[x % 3], pos)
                 if x == y == 0:
                     self.window_surface.blit(self.wind_img, pos)
                 if desc[y][x] == b"@":
@@ -528,10 +529,10 @@ class SailingDomainEnv(Env, BaseEnv):
                     self.window_surface.blit(self.chest_A_img, pos)
                 elif desc[y][x] == b"B" and not self._taken_treasures[(y, x)]:
                     self.window_surface.blit(self.chest_B_img, pos)
-                elif x == self.cols-1:
+                elif x == self.cols - 1:
                     if desc[y][x] == b"G":
                         self.window_surface.blit(self.goal_img, pos)
-                    elif y == self.rows-1:
+                    elif y == self.rows - 1:
                         self.window_surface.blit(self.coast_img[0], pos)
                     elif y == 0:
                         self.window_surface.blit(self.coast_img[2], pos)
@@ -542,8 +543,7 @@ class SailingDomainEnv(Env, BaseEnv):
 
         # Plot the grid lines
         grid_color = (100, 100, 100)
-        # grid_color = (0, 0, 0)
-        line_width = max(1, int(self._scale/3))
+        line_width = max(1, int(self._scale / 3))
 
         # Vertical lines
         for x in range(self.cols + 1):
