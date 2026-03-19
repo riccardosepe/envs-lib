@@ -338,7 +338,8 @@ class BreakthroughEnv(BaseEnv, Env):
         i, j, direction = self._decode_action(action)
 
         if check_validity and board[i, j] != player:
-            raise InvalidPieceSelectionException(f"Player {'WHITE' if player==WHITE else 'BLACK'} cannot select piece at ({i}, {j})")
+            raise InvalidPieceSelectionException(
+                f"Player {'WHITE' if player == WHITE else 'BLACK'} cannot select piece at ({i}, {j})")
 
         d_i = -1 if player == WHITE else 1
         d_j = direction - 1
@@ -366,7 +367,9 @@ class BreakthroughEnv(BaseEnv, Env):
         self._la_lan = self.decode_action_human((i, j, ii, jj))
 
         if dest_cell == self.current_player:
-            raise InvalidActionException(f"Player {'WHITE' if self.current_player==WHITE else 'BLACK'} cannot move piece from ({i}, {j}) to ({ii}, {jj}) because the destination cell is occupied by another piece of the same color.")
+            raise InvalidActionException(
+                f"Player {'WHITE' if self.current_player == WHITE else 'BLACK'} cannot move piece from ({i}, "
+                f"{j}) to ({ii}, {jj}) because the destination cell is occupied by another piece of the same color.")
 
         info = {}
         if dest_cell != EMPTY_CELL:
@@ -481,8 +484,10 @@ class BreakthroughEnv(BaseEnv, Env):
                 pygame.display.init()
                 pygame.display.set_caption("Breakthrough")
                 self.window_surface = pygame.display.set_mode(
-                    (self.window_size[0] + self.index_width,
-                     self.window_size[1] + self.index_width + self.status_bar_height)
+                    (
+                        self.window_size[0] + self.index_width,
+                        self.window_size[1] + self.index_width + self.status_bar_height
+                    )
                 )
 
         assert self.window_surface is not None, "Pygame window surface creation failed."
@@ -554,14 +559,19 @@ class BreakthroughEnv(BaseEnv, Env):
         for col, label in zip(range(self.ncol), col_labels):
             text_surface = col_font.render(label, True, (255, 255, 255))
             x = self.index_width + col * self.cell_size[0] + self.cell_size[0] // 2 - text_surface.get_width() // 2
-            y = self.status_bar_height + self.nrow * self.cell_size[1] + (self.index_width // 2 - text_surface.get_height() // 2)
+            y = (self.status_bar_height +
+                 self.nrow * self.cell_size[1] +
+                 (self.index_width // 2 - text_surface.get_height() // 2)
+                 )
             self.window_surface.blit(text_surface, (x, y))
 
         row_font = pygame.font.SysFont("arial", self._font_size, bold=True)
         for row, label in zip(range(self.nrow), row_labels):
             text_surface = row_font.render(str(label), True, (255, 255, 255))
             x = self.index_width // 2 - text_surface.get_width() // 2
-            y = self.status_bar_height + row * self.cell_size[1] + self.cell_size[1] // 2 - text_surface.get_height() // 2
+            y = (self.status_bar_height +
+                 row * self.cell_size[1] +
+                 self.cell_size[1] // 2 - text_surface.get_height() // 2)
             self.window_surface.blit(text_surface, (x, y))
 
         status_font = pygame.font.SysFont("Apple Symbols", 25)
@@ -590,9 +600,11 @@ class BreakthroughEnv(BaseEnv, Env):
             selected_piece = ""
 
         last_action = self._la_lan if self._la_lan is not None else 'None'
-        status_text = f"{self.ANSI_PIECES[WHITE]}: {white_count} | {self.ANSI_PIECES[BLACK]}: {black_count} | Turn: {turn_count} | Sel.: {selected_piece} | Last action: {last_action}"
+        status_text = (f"{self.ANSI_PIECES[WHITE]}: {white_count} | {self.ANSI_PIECES[BLACK]}: {black_count} | Turn: "
+                       f"{turn_count} | Sel.: {selected_piece} | Last action: {last_action}")
         text_surface = status_font.render(status_text, True, (0, 0, 0))
-        text_rect = text_surface.get_rect(center=((self.window_size[0] + self.index_width) // 2, self.status_bar_height // 2))
+        text_rect = text_surface.get_rect(
+            center=((self.window_size[0] + self.index_width) // 2, self.status_bar_height // 2))
         self.window_surface.blit(text_surface, text_rect)
 
         if mode == "human":
