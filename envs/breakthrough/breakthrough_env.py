@@ -1,3 +1,4 @@
+import json
 import sys
 from copy import deepcopy
 from os import path
@@ -7,10 +8,11 @@ import pygame
 from gymnasium import Env, spaces
 
 from ..common import BaseEnv
+from ..common.base_env import EnvStepException
 from ..common.constants import *
 
 
-class BreakthroughException(Exception):
+class BreakthroughException(EnvStepException):
     def __init__(self, message="Generic Breakthrough exception."):
         super().__init__(message)
 
@@ -347,6 +349,75 @@ class BreakthroughEnv(BaseEnv, Env):
             raise InvalidActionException
 
         return ii, jj
+
+    @classmethod
+    def build_checkpoint(cls, checkpoint_id: int):
+        """
+        Load a Breakthrough saved-game state by its integer ID.
+
+        Delegates to the project-level utility that knows the on-disk
+        format, then returns the normalised (ckpt_dict, agent_color)
+        pair expected by the BaseEnv checkpoint contract.
+
+        Parameters
+        ----------
+        checkpoint_id : int
+            Integer slot identifying the saved state.
+
+        Returns
+        -------
+        ckpt_dict : dict
+        agent_color : int  (WHITE or BLACK)
+        """
+
+        ckpt_id = str(checkpoint_id)
+        with open(f'config/breakthrough_scenarios.json') as f:
+            data = json.load(f)
+
+        current_player = WHITE if data[ckpt_id]['current_player'] == 'white' else BLACK
+
+        if data[ckpt_id]['agent_color'] == 'white':
+            agent_color = WHITE
+        elif data[ckpt_id]['agent_color'] == 'black':
+            agent_color = BLACK
+        else:
+            raise ValueError("Unknown agent color in checkpoint")
+
+        ckpt = {
+            "current_player": current_player,
+            'done': False,
+            'last_action': None,
+            'last_action_lan': data[ckpt_id].get('last_action_lan', None),
+            't': data[ckpt_id].get('t', 0),
+        }
+
+        char_board = np.asarray(data[ckpt_id]['board'], dtype='c')
+        board = np.zeros_like(char_board, dtype=int)
+        board[char_board == b'b'] = BLACK
+        board[char_board == b'w'] = WHITE
+        board[char_board == b'.'] = EMPTY_CELL
+
+        ckpt['board'] = board
+
+        state = (
+            {WHITE: {i: None for i in range(16)}, BLACK: {i: None for i in range(16)}},
+            current_player
+        )
+
+        num_white = num_black = 0
+        for i in range(board.shape[0]):
+            for j in range(board.shape[1]):
+                piece = board[i, j]
+                if piece == WHITE:
+                    state[0][WHITE][num_white] = (i, j)
+                    num_white += 1
+                if piece == BLACK:
+                    state[0][BLACK][num_black] = (i, j)
+                    num_black += 1
+
+        ckpt['state'] = state
+
+        return ckpt, agent_color
 
     def step(self, action):
         if not self.action_space.contains(action):

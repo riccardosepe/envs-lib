@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 
 import numpy as np
@@ -7,6 +8,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
 from ..common import BaseEnv
+from ..common.base_env import EnvStepException
 from ..common.constants import EMPTY_CELL, WHITE, BLACK
 
 
@@ -202,18 +204,72 @@ class Connect4Env(Env, BaseEnv):
         self.agent_color = agent_color
         self.human_color = self.opponent_color(agent_color)
 
-        if 'checkpoint' in kwargs:
-            checkpoint = kwargs['checkpoint']
-            if not self.load(checkpoint):
-                raise ValueError("Invalid checkpoint provided for Connect4Env reset.")
-        else:
-            # initialize board with EMPTY_CELL
-            self.board = np.full((self.num_columns, self.column_height), EMPTY_CELL)
-            self.current_player = WHITE
-            self._done = 0
-            self.t = 0
-            self._la = None
+        # Always start from a clean board; callers that need to resume
+        # from a checkpoint call env.load(ckpt_dict) afterwards, following
+        # the same pattern as BreakthroughEnv (and the BaseEnv contract).
+        self.board = np.full((self.num_columns, self.column_height), EMPTY_CELL)
+        self.current_player = WHITE
+        self._done = 0
+        self.t = 0
+        self._la = None
         return self.observation
+
+    @classmethod
+    def build_checkpoint(cls, checkpoint_id: int):
+        """
+        Load a Connect4 saved-game state by its integer ID.
+
+        Parameters
+        ----------
+        checkpoint_id : int
+
+        Returns
+        -------
+        ckpt_dict : dict
+        agent_color : int  (WHITE or BLACK)
+        """
+        ckpt_id = str(checkpoint_id)
+        with open(f'config/connect4_scenarios.json') as f:
+            data = json.load(f)
+
+        if data[ckpt_id]['current_player'] == 'white':
+            current_player = WHITE
+        elif data[ckpt_id]['current_player'] == 'black':
+            current_player = BLACK
+        else:
+            raise ValueError("Unknown player color in checkpoint")
+
+        if data[ckpt_id]['agent_color'] == 'white':
+            agent_color = WHITE
+        elif data[ckpt_id]['agent_color'] == 'black':
+            agent_color = BLACK
+        else:
+            raise ValueError("Unknown agent color in checkpoint")
+        ckpt = {
+            "current_player": current_player,
+            'done': False,
+            'last_action': data[ckpt_id].get('last_action', None),
+            't': data[ckpt_id].get('t', 0),
+        }
+
+        # Parse board from scenario (array of column strings)
+        board_data = data[ckpt_id]['board']
+        height = len(board_data[0]) if board_data else 6
+        width = len(board_data)
+        board = np.full((width, height), EMPTY_CELL, dtype=int)
+
+        for col_idx, col_str in enumerate(board_data):
+            for row_idx, char in enumerate(col_str):
+                if char.lower() == 'w':
+                    board[col_idx][row_idx] = WHITE
+                elif char.lower() == 'b':
+                    board[col_idx][row_idx] = BLACK
+
+        ckpt['board'] = board
+        state = (board, current_player)
+        ckpt['state'] = state
+
+        return ckpt, agent_color
 
     def step(self, action):
         """
@@ -225,7 +281,7 @@ class Connect4Env(Env, BaseEnv):
             raise RuntimeError("Connect4Env was terminated")
 
         if action not in self.legal_actions:
-            raise IndexError(
+            raise EnvStepException(
                 f"Invalid move. Tried column {action}. "
                 f"Legal actions are: {self.legal_actions}"
             )

@@ -1,6 +1,27 @@
 from abc import ABC, abstractmethod
 
 
+# ==============================================================================
+# Framework-level exception
+# ==============================================================================
+
+class EnvStepException(Exception):
+    """
+    Base exception for illegal or invalid actions passed to env.step().
+
+    Raising this from within step() signals to the game loop that the
+    move was rejected and the turn should NOT advance.  Domain-specific
+    exceptions (e.g. BreakthroughException) must inherit from this class
+    so that the loop can catch them with a single except clause.
+    """
+    def __init__(self, message="Illegal or invalid action."):
+        super().__init__(message)
+
+
+# ==============================================================================
+# Base environment interface
+# ==============================================================================
+
 class BaseEnv(ABC):
     """
     This class is to be intended in the sense of a Java interface. All the custom environments must both inherit
@@ -17,6 +38,26 @@ class BaseEnv(ABC):
 
     Subclasses MUST call super().backup() / super().load() first, then extend the
     returned dict / restore additional attributes.
+
+    Checkpoint contract
+    -------------------
+    Subclasses that support resuming from a saved game state MUST implement
+    load_checkpoint(checkpoint_id).  Subclasses that do NOT support checkpoints
+    (e.g. single-agent envs with no save format) should leave the default
+    implementation in place, which raises NotImplementedError.
+
+    The classmethod signature is:
+
+        @classmethod
+        def load_checkpoint(cls, checkpoint_id: int) -> tuple[dict, int | None]:
+            ...
+
+    Return value: (ckpt_dict, agent_color)
+      - ckpt_dict    : the state dict to be passed to env.load()
+      - agent_color  : WHITE or BLACK for adversarial envs, None for single-agent
+
+    The caller (main._build_env) is responsible for calling env.reset() and
+    env.load(ckpt_dict) after receiving these values.
     """
 
     WON = 0
@@ -94,6 +135,43 @@ class BaseEnv(ABC):
           - multi-objective envs (e.g. SailingDomain) return a vector (np.ndarray)
         """
         pass
+
+    # ------------------------------------------------------------------
+    # Checkpoint classmethod
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def build_checkpoint(cls, checkpoint_id: int):
+        """
+        Load a previously saved game state by its integer ID.
+
+        Subclasses that support checkpoints MUST override this method.
+        The default implementation raises NotImplementedError so that
+        outdated or checkpoint-unaware envs fail loudly rather than
+        silently passing through an ID that is ignored.
+
+        Parameters
+        ----------
+        checkpoint_id : int
+            An integer key identifying the saved state (e.g. a slot
+            number, an episode index, or a database row id).
+
+        Returns
+        -------
+        ckpt_dict : dict
+            State snapshot suitable for passing to env.load().
+        agent_color : int or None
+            WHITE or BLACK for adversarial envs; None for single-agent.
+
+        Raises
+        ------
+        NotImplementedError
+            If the subclass has not implemented checkpoint support.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} does not implement load_checkpoint(). "
+            "Either add checkpoint support or do not pass a checkpoint_id."
+        )
 
     # ------------------------------------------------------------------
     # Shared player utility (adversarial envs)
