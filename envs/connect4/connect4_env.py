@@ -74,7 +74,7 @@ class Connect4Env(Env, BaseEnv):
         self.board = None
         self.current_player = None
         self._la = None
-        self.done = None
+        self._done = None
         self.t = 0
         # Set human/agent colors using constants (human was first player in original)
         self.human_color = None
@@ -97,7 +97,7 @@ class Connect4Env(Env, BaseEnv):
     def __copy__(self):
         new_env = Connect4Env(self.num_columns, self.column_height, self.connect)
         new_env.board = deepcopy(self.board)
-        new_env.done = self.done
+        new_env._done = self._done
         new_env.current_player = self.current_player
         new_env.human_color = self.human_color
         new_env.agent_color = self.agent_color
@@ -112,15 +112,6 @@ class Connect4Env(Env, BaseEnv):
     @property
     def other_player(self):
         return self.opponent_color(self.current_player)
-
-    @staticmethod
-    def opponent_color(color):
-        """
-        Returns the opponent color for the given color.
-        """
-        # p = 1-(p-1)+1 = 3 - p
-        assert color is not None
-        return 3 - color
 
     @property
     def legal_actions(self):
@@ -150,26 +141,39 @@ class Connect4Env(Env, BaseEnv):
     def max_episode_length(self):
         return self._max_episode_length
 
+    # ------------------------------------------------------------------
+    # BaseEnv interface
+    # ------------------------------------------------------------------
+
+    def reward(self):
+        if not self.done:
+            return 0
+        else:
+            if self.done == self.human_color:
+                return -1
+            elif self.done == self.agent_color:
+                return 1
+            else:
+                return 0
+
+    def _player_label(self):
+        return 'Human' if self.current_player == self.human_color else 'Agent'
+
     def backup(self):
-        return {
+        state = super().backup()
+        state.update({
             'state': self.observation,
             'board': deepcopy(self.board),
-            'done': self.done,
-            'last_action': self._la,
-            't': self.t,
             'current_player': self.current_player,
-            'reward': self.reward(),
-            'player': 'Human' if self.current_player == self.human_color else 'Agent'
-        }
+        })
+        return state
 
     def load(self, checkpoint):
         try:
+            super().load(checkpoint)
             board, player = checkpoint['state']
             self.board = deepcopy(board)
             self.current_player = checkpoint['current_player']
-            self.done = checkpoint['done']
-            self._la = checkpoint['last_action']
-            self.t = checkpoint['t']
             return True
         except KeyError:
             return False
@@ -188,16 +192,9 @@ class Connect4Env(Env, BaseEnv):
                 return 0
             return 1 if self.done == self.human_color else 0
 
-    def reward(self):
-        if not self.done:
-            return 0
-        else:
-            if self.done == self.human_color:
-                return -1
-            elif self.done == self.agent_color:
-                return 1
-            else:
-                return 0
+    # ------------------------------------------------------------------
+    # Game logic
+    # ------------------------------------------------------------------
 
     def reset(self, **kwargs):
         assert 'agent_color' in kwargs
@@ -214,7 +211,7 @@ class Connect4Env(Env, BaseEnv):
             # initialize board with EMPTY_CELL
             self.board = np.full((self.num_columns, self.column_height), EMPTY_CELL)
             self.current_player = WHITE
-            self.done = 0
+            self._done = 0
             self.t = 0
             self._la = None
         return self.observation
@@ -242,9 +239,9 @@ class Connect4Env(Env, BaseEnv):
 
         # Check game termination
         if self.four_in_a_row(self.board, self.current_player):
-            self.done = self.current_player
+            self._done = self.current_player
         elif all(self.board[col][self.column_height - 1] != EMPTY_CELL for col in range(self.num_columns)):
-            self.done = True
+            self._done = True
 
         self.current_player = WHITE if self.current_player == BLACK else BLACK
 
@@ -301,6 +298,10 @@ class Connect4Env(Env, BaseEnv):
 
         col_char = chr(ord('A') + action)
         return f"{col_char}{row}"
+
+    # ------------------------------------------------------------------
+    # Rendering
+    # ------------------------------------------------------------------
 
     def render(self, **kwargs):
         """
