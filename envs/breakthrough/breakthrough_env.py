@@ -48,7 +48,7 @@ class BreakthroughEnv(BaseEnv, Env):
         self.action_space = spaces.Discrete(self.ncol * self.nrow * 3)
         self.observation_space = spaces.Box(low=0, high=2, shape=(self.nrow, self.ncol), dtype=np.uint8)
         self.board = None
-        self.done = False
+        self._done = False
         self.current_player = None
         self.human_color = None
         self.agent_color = None
@@ -84,7 +84,7 @@ class BreakthroughEnv(BaseEnv, Env):
     def __copy__(self):
         new_env = BreakthroughEnv(max_episode_length=self.max_episode_length, render_mode=self.render_mode)
         new_env.board = deepcopy(self.board)
-        new_env.done = self.done
+        new_env._done = self._done
         new_env.current_player = self.current_player
         new_env.human_color = self.human_color
         new_env.agent_color = self.agent_color
@@ -125,15 +125,6 @@ class BreakthroughEnv(BaseEnv, Env):
     def max_episode_length(self):
         return self._max_episode_length
 
-    @staticmethod
-    def opponent_color(color):
-        """
-        Returns the opponent color for the given color.
-        """
-        # p = 1-(p-1)+1 = 3 - p
-        assert color is not None
-        return 3 - color
-
     def get_piece_id_from_pos(self, i, j):
         color = self.board[i, j]
         piece_id = next((k for k, v in self._pieces_positions[color].items() if v == (i, j)), None)
@@ -147,7 +138,15 @@ class BreakthroughEnv(BaseEnv, Env):
         else:
             return list(reversed(self.DIRECTIONS))[d]
 
+    # ------------------------------------------------------------------
+    # BaseEnv interface
+    # ------------------------------------------------------------------
+
     def reward(self):
+        """
+        Returns a scalar reward from the perspective of the *agent*:
+          +1 if the agent won, -1 if the human won, 0 while still running.
+        """
         if not self.done:
             return 0
         else:
@@ -155,6 +154,82 @@ class BreakthroughEnv(BaseEnv, Env):
                 return -1
             else:
                 return 1
+
+    @property
+    def legal_actions(self):
+        """
+        This property calls the utility method legal_actions_board with the current board and player.
+        """
+        return self.legal_actions_board(self.board, self.current_player)
+
+    @property
+    def _last_action(self):
+        return self._la
+
+    @property
+    def adversarial(self):
+        return True
+
+    def _player_label(self):
+        return 'Human' if self.current_player == self.human_color else 'Agent'
+
+    def backup(self):
+        """
+        Snapshot the full environment state.
+        Common MCTS fields come from super(); breakthrough-specific fields
+        (board, pieces_positions, current_player, last_action_lan, state)
+        are added here.
+        """
+        state = super().backup()
+        state.update({
+            'state': self.observation,
+            'board': deepcopy(self.board),
+            'pieces_positions': deepcopy(self._pieces_positions),
+            'current_player': self.current_player,
+            'last_action_lan': self._la_lan,
+        })
+        return state
+
+    def load(self, checkpoint):
+        """
+        Restore the full environment state.
+        Common MCTS fields are restored by super(); breakthrough-specific
+        fields are restored here.
+        """
+        try:
+            super().load(checkpoint)
+            pieces, player = checkpoint['state']
+            self.board = self.build_board_from_obs(pieces, self.nrow, self.ncol)
+            self._pieces_positions = pieces
+            self.current_player = player
+            self._la_lan = checkpoint['last_action_lan']
+        except KeyError as e:
+            print(e, file=sys.stderr)
+            return False
+        return True
+
+    def game_result(self, human_readable=False):
+        if human_readable:
+            if not self.done:
+                s = "Game still running..."
+            else:
+                if self.done == self.human_color:
+                    s = "You won!"
+                else:
+                    s = "You lost!"
+        else:
+            if not self.done:
+                s = 0
+            else:
+                if self.done == self.human_color:
+                    s = 1
+                else:
+                    s = 0
+        return s
+
+    # ------------------------------------------------------------------
+    # Game logic
+    # ------------------------------------------------------------------
 
     def reset(self, **kwargs):
         if 'seed' in kwargs:
@@ -175,7 +250,7 @@ class BreakthroughEnv(BaseEnv, Env):
         self.board = np.zeros((self.nrow, self.ncol), dtype=np.uint8)
         self.board[0:2, :] = BLACK
         self.board[-2:, :] = WHITE
-        self.done = False
+        self._done = False
         self.current_player = WHITE
         self.t = 0
         self._la = None
@@ -314,13 +389,13 @@ class BreakthroughEnv(BaseEnv, Env):
 
         # check for the game to be over
         if self.current_player == WHITE and ii == 0:
-            self.done = WHITE
-        elif self.current_player == BLACK and ii == self.nrow-1:
-            self.done = BLACK
+            self._done = WHITE
+        elif self.current_player == BLACK and ii == self.nrow - 1:
+            self._done = BLACK
         elif len(list(filter(lambda p: p is not None, self._pieces_positions[WHITE].values()))) == 0:
-            self.done = BLACK
+            self._done = BLACK
         elif len(list(filter(lambda p: p is not None, self._pieces_positions[BLACK].values()))) == 0:
-            self.done = WHITE
+            self._done = WHITE
 
         # change turn
         self.current_player = self.other_player
@@ -330,6 +405,58 @@ class BreakthroughEnv(BaseEnv, Env):
         self._la = action
 
         return self.observation, self.reward(), self.done, truncated, info
+
+    def legal_actions_board(self, board, player):
+        """
+        This is a utility method that computes the legal actions for a given board and player.
+        """
+        la = []
+        for i in range(self.nrow):
+            for j in range(self.ncol):
+                if board[i, j] != player:
+                    continue
+                for d_idx, direction in enumerate(self.DIRECTIONS):
+                    d_j = d_idx - 1
+                    d_i = -1 if player == WHITE else 1
+
+                    ii = i + d_i
+                    jj = j + d_j
+
+                    if self._legal_position(ii, jj):
+                        dest_cell = board[ii, jj]
+                        if d_j == 0 and dest_cell == 0:
+                            la.append(self._encode_action(i, j, direction))
+                        elif d_j != 0 and dest_cell != self.current_player:
+                            la.append(self._encode_action(i, j, direction))
+
+        return la
+
+    @staticmethod
+    def build_board_from_obs(obs, nrow, ncol):
+        board = np.zeros((nrow, ncol), dtype=np.uint8)
+        for color, positions in obs.items():
+            for piece_id, pos in positions.items():
+                if pos is None:
+                    continue
+                board[pos[0], pos[1]] = color
+        return board
+
+    @staticmethod
+    def board_is_terminal(board):
+        """
+        The board is terminal either if one player has reached the opponent's baseline
+        or if one player has no pieces left.
+        """
+        if np.any(board[0, :] == WHITE) or np.any(board[-1, :] == BLACK):
+            return True
+        if not np.any(board == WHITE):
+            return True
+        if not np.any(board == BLACK):
+            return True
+
+    # ------------------------------------------------------------------
+    # Rendering
+    # ------------------------------------------------------------------
 
     def render(self):
         if self.render_mode == 'ansi':
@@ -485,111 +612,6 @@ class BreakthroughEnv(BaseEnv, Env):
             pygame.display.update()
             self.clock.tick(self.metadata["render_fps"])
 
-    @property
-    def legal_actions(self):
-        """
-        This property calls the utility method legal_actions_board with the current board and player.
-        """
-        return self.legal_actions_board(self.board, self.current_player)
-
-
-    def legal_actions_board(self, board, player):
-        """
-        This is a utility method that computes the legal actions for a given board and player.
-        """
-        la = []
-        for i in range(self.nrow):
-            for j in range(self.ncol):
-                if board[i, j] != player:
-                    continue
-                for d_idx, direction in enumerate(self.DIRECTIONS):
-                    d_j = d_idx - 1
-                    d_i = -1 if player == WHITE else 1
-
-                    ii = i + d_i
-                    jj = j + d_j
-
-                    if self._legal_position(ii, jj):
-                        dest_cell = board[ii, jj]
-                        if d_j == 0 and dest_cell == 0:
-                            # can go straight only if the cell is empty
-                            la.append(self._encode_action(i, j, direction))
-                        elif d_j != 0 and dest_cell != self.current_player:
-                            # can go diagonally only if empty cell or opponent piece
-                            la.append(self._encode_action(i, j, direction))
-
-        return la
-
-    @property
-    def _last_action(self):
-        return self._la
-
-    @property
-    def adversarial(self):
-        return True
-
-    @staticmethod
-    def build_board_from_obs(obs, nrow, ncol):
-        board = np.zeros((nrow, ncol), dtype=np.uint8)
-        for color, positions in obs.items():
-            for piece_id, pos in positions.items():
-                if pos is None:
-                    continue
-                board[pos[0], pos[1]] = color
-
-        return board
-
-    def backup(self):
-        state = {
-            'state': self.observation,
-            'board': deepcopy(self.board),
-            'done': self.done,
-            'last_action': self._last_action,
-            'last_action_lan': self._la_lan,
-            't': self.t,
-            'reward': self.reward(),
-            'pieces_positions': deepcopy(self._pieces_positions),
-            'current_player': self.current_player,
-            'player': 'Human' if self.current_player == self.human_color else 'Agent',
-        }
-        return state
-
-    def load(self, checkpoint):
-        try:
-            pieces, player = checkpoint['state']
-            self.board = self.build_board_from_obs(pieces, self.nrow, self.ncol)
-            self.done = checkpoint['done']
-            self._la = checkpoint['last_action']
-            self._la_lan = checkpoint['last_action_lan']
-            self.current_player = player
-            self.t = checkpoint['t']
-            self._pieces_positions = pieces
-        except KeyError as e:
-            print(e, file=sys.stderr)
-            return False
-        return True
-
-    def game_result(self, human_readable=False):
-        if human_readable:
-            if not self.done:
-                s = "Game still running..."
-            else:
-                if self.done == self.human_color:
-                    s = "You won!"
-                else:
-                    s = "You lost!"
-
-        else:
-            if not self.done:
-                s = 0
-            else:
-                if self.done == self.human_color:
-                    s = 1
-                else:
-                    s = 0
-
-        return s
-
     def get_square_under_mouse(self, pos):
         j, i = pos
         return (i-self.status_bar_height) // self.cell_size[1], (j-self.index_width) // self.cell_size[0]
@@ -636,23 +658,6 @@ class BreakthroughEnv(BaseEnv, Env):
                     self.selected = (row, col)
                     if self.render_mode == 'human':
                         self.render()
-
-    @staticmethod
-    def board_is_terminal(board):
-        """
-        The board is terminal either if one player has reached the opponent's baseline
-        or if one player has no pieces left.
-        """
-        # Check if a player has reached opponent's baseline
-        if np.any(board[0, :] == WHITE) or np.any(board[-1, :] == BLACK):
-            return True
-
-        # Check if a player has no pieces left
-        if not np.any(board == WHITE):
-            return True
-
-        if not np.any(board == BLACK):
-            return True
 
 
 def human_main():
