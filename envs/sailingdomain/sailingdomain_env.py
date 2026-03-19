@@ -124,12 +124,15 @@ class SailingDomainEnv(Env, BaseEnv):
 
         self._terminate_on_obstacle = kwargs.pop("terminate_on_obstacle", False)
 
+        # No meaningful timestep cap — the wind guarantees termination.
+        self._max_episode_length = np.inf
+
         # State
         self.state = None
         self._done = False
         self.t = None
         self._la = None
-        self._last_reward = None
+        self._last_reward = None  # reward is r(s, a, s'); stored in step() for reward()
 
         # Rendering
         self._scale = 2
@@ -204,10 +207,15 @@ class SailingDomainEnv(Env, BaseEnv):
         self.t += 1
         self._la = action
 
-        self._last_reward = self.reward(new_pos)
-        done = self._done = self.done(new_pos)
+        # Compute and store the transition reward so reward() can return it.
+        self._last_reward = self._compute_reward(new_pos)
+        self._done = self._is_terminal(new_pos)
 
-        return self.observation(), self._last_reward, done, False, {}
+        return self.observation(), self._last_reward, self.done, False, {}
+
+    # ------------------------------------------------------------------
+    # BaseEnv interface
+    # ------------------------------------------------------------------
 
     @property
     def legal_actions(self):
@@ -226,10 +234,117 @@ class SailingDomainEnv(Env, BaseEnv):
     def adversarial(self):
         return False
 
-    def game_result(self, **kwargs):
-        pass
+    @property
+    def state_space_cardinality(self):
+        return self.state_space.n
 
-    def reward(self, new_pos, **kwargs):
+    @property
+    def action_space_cardinality(self):
+        return self.action_space.n
+
+    @property
+    def max_episode_length(self):
+        return self._max_episode_length
+
+    def reward(self):
+        """
+        Returns the reward associated with the last transition, as a vector
+        of length `reward_space_cardinality`. Returns None before the first step.
+
+        The reward is computed during step() and stored in self._last_reward so
+        that this zero-argument signature is consistent with the rest of the framework.
+        """
+        return self._last_reward
+
+    def game_result(self, human_readable=False):
+        """
+        Returns a summary of the outcome of the episode.
+
+        Because this is a single-agent, multi-objective environment, there is
+        no win/loss outcome. Instead, game_result() aggregates the collected
+        rewards into a human-readable or structured numeric summary.
+
+        The reward vector has four components:
+            [0] obstacle penalty
+            [1] treasure A reward
+            [2] treasure B reward
+            [3] goal / shore reward
+        """
+        if self._last_reward is None:
+            return "Episode not started." if human_readable else None
+
+        r = self._last_reward  # reward vector of the terminal step
+        reached_goal = self.state == self.goal_pos
+        n_a = sum(self._taken_treasures[k] for k in self.treasures_a)
+        n_b = sum(self._taken_treasures[k] for k in self.treasures_b)
+
+        if human_readable:
+            goal_str = "Reached goal ✓" if reached_goal else "Did not reach goal ✗"
+            return (
+                f"{goal_str} | "
+                f"Treasures A: {n_a}/{len(self.treasures_a)} | "
+                f"Treasures B: {n_b}/{len(self.treasures_b)} | "
+                f"Terminal reward: {r[3]:.2f} | "
+                f"Obstacle hit: {'Yes' if r[0] < 0 else 'No'}"
+            )
+        else:
+            return {
+                'reached_goal':    reached_goal,
+                'n_treasures_a':   n_a,
+                'n_treasures_b':   n_b,
+                'terminal_reward': r[3],
+                'obstacle_hit':    r[0] < 0,
+            }
+
+    def backup(self):
+        """
+        Snapshot the full environment state.
+        Common MCTS fields come from super(); sailing-specific fields
+        (state, taken_treasures) are added here.
+        """
+        state = super().backup()
+        state.update({
+            'state':           self.state,
+            'taken_treasures': self._taken_treasures.copy(),
+        })
+        return state
+
+    def load(self, checkpoint):
+        """
+        Restore the full environment state.
+        Common MCTS fields are restored by super(); sailing-specific
+        fields are restored here.
+        """
+        try:
+            super().load(checkpoint)
+            # super().load() restored self._done via the done setter
+            self.state = checkpoint['state']
+            self._last_reward = checkpoint['reward']
+            if 'map_name' in checkpoint:
+                self._setup_map(checkpoint['map_name'])
+            else:
+                self._taken_treasures = checkpoint['taken_treasures'].copy()
+        except KeyError as e:
+            raise RuntimeError("Invalid checkpoint format") from e
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def reward_space_cardinality(self):
+        # OBS: the number of entries should be the number of different concepts
+        #  for example, in a single cell there technically could be both a golden and a silver chest, or
+        #  a chest and the goal, or a chest and an obstacle
+        #  However, the terminal state rewards are mutually exclusive, either you get to the goal and get 1
+        #  or you end up on the shore and get 0.05
+        return 4
+
+    def _compute_reward(self, new_pos):
+        """
+        Compute the reward vector for transitioning into new_pos.
+        Entries: [obstacle, treasure_A, treasure_B, goal/shore].
+        """
         reward_vector = np.zeros(self.reward_space_cardinality)
         if new_pos in self.obstacles:
             reward_vector[0] = self._obstacle_reward
@@ -248,61 +363,22 @@ class SailingDomainEnv(Env, BaseEnv):
 
         return reward_vector
 
-    def done(self, new_pos):
+    def _is_terminal(self, new_pos):
+        """
+        Returns True if new_pos is a terminal state.
+        Renamed from done() to avoid collision with the self.done property.
+        """
         if new_pos[1] == self.cols - 1 or (self._terminate_on_obstacle and new_pos in self.obstacles):
             return True
         else:
             return False
 
-    @property
-    def state_space_cardinality(self):
-        return self.state_space.n
+    def decode_action_human(self, a):
+        return self._act_id_to_action[a]
 
-    @property
-    def action_space_cardinality(self):
-        return self.action_space.n
-
-    @property
-    def reward_space_cardinality(self):
-        # OBS: the number of entries should be the number of different concepts
-        #  for example, in a single cell there technically could be both a golden and a silver chest, or
-        #  a chest and the goal, or a chest and an obstacle
-        #  However, the terminal state rewards are mutually exclusive, either you get to the goal and get 1
-        #  or you end up on the shore and get 0.05
-        return 4
-
-    @property
-    def max_episode_length(self):
-        return self._max_episode_length
-
-    def backup(self):
-        ckpt = {
-            'state': self.state,
-            'last_action': self._la,
-            'done': self._done,
-            't': self.t,
-            'reward': self._last_reward,
-            'taken_treasures': self._taken_treasures.copy(),
-            'player': 'Agent'
-        }
-        return ckpt
-
-    def load(self, checkpoint):
-        try:
-            skip = False
-            if 'map_name' in checkpoint:
-                skip = True
-                self._setup_map(checkpoint['map_name'])
-
-            self.state = checkpoint['state']
-            self._la = checkpoint['last_action']
-            self._last_reward = checkpoint['reward']
-            self._done = checkpoint['done']
-            self.t = checkpoint['t']
-            if not skip:
-                self._taken_treasures = checkpoint['taken_treasures'].copy()
-        except KeyError as e:
-            raise RuntimeError("Invalid checkpoint format") from e
+    # ------------------------------------------------------------------
+    # Rendering
+    # ------------------------------------------------------------------
 
     def render(self):
         if self.state is None:
@@ -504,9 +580,6 @@ class SailingDomainEnv(Env, BaseEnv):
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(self.window_surface)), axes=(1, 0, 2)
             )
-
-    def decode_action_human(self, a):
-        return self._act_id_to_action[a]
 
 
 if __name__ == '__main__':
