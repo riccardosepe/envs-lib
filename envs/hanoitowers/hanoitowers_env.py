@@ -29,6 +29,14 @@ class TowersOfHanoiEnv(BaseEnv, Env):
     def max_episode_length(self):
         return self._max_episode_length
 
+    @property
+    def state_space_cardinality(self):
+        return self.num_pegs**self.num_disks
+
+    @property
+    def action_space_cardinality(self):
+        return len(self.action_dict)
+
     def __init__(self, num_disks=3, num_pegs=3):
         """
         Initialize the Towers of Hanoi environment.
