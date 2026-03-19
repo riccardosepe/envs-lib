@@ -1,10 +1,8 @@
-import io
 from copy import deepcopy
 
 import numpy as np
 from gymnasium import Env
 from gymnasium.spaces import Discrete
-from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
@@ -86,7 +84,8 @@ class Connect4Env(Env, BaseEnv):
         self.window_size = (min(64 * self.num_columns, 512), min(64 * self.column_height, 512))
         self._rectangles = {}  # dict of cell coordinate lists to highlight (e.g. winning 4-in-a-row)
         self._alternatives = {}  # dict of alternative actions to render
-        self.cell_size = (self.window_size[0] // max(1, self.num_columns), self.window_size[1] // max(1, self.column_height))
+        self.cell_size = (self.window_size[0] // max(1, self.num_columns),
+                          self.window_size[1] // max(1, self.column_height))
         self.index_width = 24
         self.status_bar_height = 50
         self.window_surface = None
@@ -254,7 +253,7 @@ class Connect4Env(Env, BaseEnv):
 
         return self.observation, self.reward(), self.done, truncated, info
 
-    def four_in_a_row(self,board, player):
+    def four_in_a_row(self, board, player):
         """Checks if `player` has a 4-piece line"""
         return (
                 any(
@@ -337,7 +336,7 @@ class Connect4Env(Env, BaseEnv):
     def _render_gui(self):
         try:
             import pygame
-            def latex_to_surface(latex_str, color=(0,0,0), font_size=20):
+            def latex_to_surface(latex_str, color=(0, 0, 0), font_size=20):
                 canvas = render_latex(latex_str, color=color, font_size=font_size)
                 # Draw the canvas
                 canvas.draw()
@@ -445,7 +444,9 @@ class Connect4Env(Env, BaseEnv):
                 label = chr(ord('A') + col)
                 text_surface = col_font.render(label, True, (255, 255, 255))
                 x = self.index_width + col * self.cell_size[0] + self.cell_size[0] // 2 - text_surface.get_width() // 2
-                y = self.status_bar_height + self.column_height * self.cell_size[1] + (self.index_width // 2 - text_surface.get_height() // 2)
+                y = (self.status_bar_height +
+                     self.column_height * self.cell_size[1] +
+                     (self.index_width // 2 - text_surface.get_height() // 2))
                 self.window_surface.blit(text_surface, (x, y))
         except Exception:
             # Fonts may fail on some systems; ignore if so
@@ -463,7 +464,9 @@ class Connect4Env(Env, BaseEnv):
                 text_surface = col_font.render(label, True, (255, 255, 255))
                 # center the row label vertically within the cell and horizontally within index_width
                 x = (self.index_width // 2) - (text_surface.get_width() // 2)
-                y = self.status_bar_height + row * self.cell_size[1] + (self.cell_size[1] // 2 - text_surface.get_height() // 2)
+                y = (self.status_bar_height +
+                     row * self.cell_size[1] +
+                     (self.cell_size[1] // 2 - text_surface.get_height() // 2))
                 self.window_surface.blit(text_surface, (x, y))
         except Exception:
             # ignore font/rendering errors for row labels
@@ -540,7 +543,7 @@ class Connect4Env(Env, BaseEnv):
             else:
                 # Diagonal
                 angle = -45 if dx * dy > 0 else 45
-                length = 2 * radius + 3 * 2**0.5 * min(self.cell_size) + 8
+                length = 2 * radius + 3 * 2 ** 0.5 * min(self.cell_size) + 8
 
             thickness = cell_h
 
@@ -582,11 +585,9 @@ class Connect4Env(Env, BaseEnv):
             )
 
             # 5. Draw the text at the top-left (right above the rectangle)
-            surf.blit(text_surf, (thickness//2, 0))
+            surf.blit(text_surf, (thickness // 2, 0))
 
-            # --- NEW CODE END ---
-
-            # Rotate surface (this remains exactly as you had it)
+            # Rotate surface
             rotated = pygame.transform.rotate(surf, angle)
 
             # Position at midpoint of first and last disc
