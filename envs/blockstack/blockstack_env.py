@@ -191,6 +191,11 @@ class BlockStackEnv(Env, BaseEnv):
         # OBS: there is a 1:1 mapping between keys and values
         return self._inverse_action_map[(src, dest)]
 
+    @staticmethod
+    def canonicalize(stacks):
+        # stacks is list[list[str]] from env.stacks (bottom-to-top)
+        return '|'.join(sorted(''.join(s) for s in stacks))
+
 
 
 if __name__ == '__main__':
