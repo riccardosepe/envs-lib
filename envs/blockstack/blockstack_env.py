@@ -1,7 +1,6 @@
 import math
 
 import numpy as np
-import scipy
 from gymnasium import Env, spaces
 
 from libs.envs.envs.common import BaseEnv
@@ -173,7 +172,10 @@ class BlockStackEnv(Env, BaseEnv):
         pass
 
     def reward(self, **kwargs):
-        return self._block_value * self.tallest_stack
+        if self.done:
+            return 1.0
+        else:
+            return -0.01
 
     @property
     def state_space_cardinality(self):
