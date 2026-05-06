@@ -150,10 +150,24 @@ class BlockStackEnv(Env, BaseEnv):
         return False
 
     def backup(self):
-        pass
+        backup = BaseEnv.backup(self)
+        backup.update({
+            'state': self.state.copy(),
+            'tallest_stack': self.tallest_stack,
+        })
+        return backup
 
     def load(self, checkpoint):
-        pass
+        try:
+            self.state = checkpoint['state']
+            self.done = checkpoint['done']
+            self._la = checkpoint['last_action']
+            self.t = checkpoint['t']
+            self.tallest_stack = checkpoint['tallest_stack']
+        except KeyError as e:
+            print(e)
+            return False
+        return True
 
     def game_result(self, **kwargs):
         pass
