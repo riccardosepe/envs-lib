@@ -215,6 +215,18 @@ class BlockStackEnv(Env, BaseEnv):
                     state[block] = stack[i-1]
         return state
 
+    @staticmethod
+    def state_to_input(state):
+        blocks = list(sorted(state.keys()))
+        n = len(blocks)
+        idx = {b: i for i, b in enumerate(blocks)}
+        idx['table'] = n
+
+        x = np.zeros((n, n + 1), dtype=np.float32)
+        for b in blocks:
+            x[idx[b], idx[state[b]]] = 1.0
+        return x.flatten()
+
 
 
 if __name__ == '__main__':
