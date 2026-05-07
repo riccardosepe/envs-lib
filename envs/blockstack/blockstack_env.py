@@ -3,7 +3,7 @@ import math
 import numpy as np
 from gymnasium import Env, spaces
 
-from libs.envs.envs.common import BaseEnv
+from libs.envs.envs.common import BaseEnv, EnvStepException
 
 
 # from ..common import BaseEnv
@@ -78,7 +78,7 @@ class BlockStackEnv(Env, BaseEnv):
 
     def step(self, action):
         if action not in self.legal_actions:
-            raise ValueError
+            raise EnvStepException
 
         source, dest = self._action_map[action]
         self.state[source] = dest
