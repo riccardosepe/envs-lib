@@ -1,4 +1,5 @@
 import math
+from collections import deque
 
 import numpy as np
 from gymnasium import Env, spaces
@@ -26,7 +27,6 @@ class BlockStackEnv(Env, BaseEnv):
         self.state = None
         self.done = False
         self.t = None
-        self.tallest_stack = None
         self.state_space = spaces.Discrete(self._bell_number(num_blocks))
         self.action_space = spaces.Discrete(num_blocks**2)
         self._max_episode_length = 4*num_blocks
@@ -71,7 +71,6 @@ class BlockStackEnv(Env, BaseEnv):
         self.done = False
         self._la = None
         self.t = 0
-        self.tallest_stack = 1
         return self.observation(), {}
 
     def observation(self):
@@ -84,12 +83,10 @@ class BlockStackEnv(Env, BaseEnv):
         source, dest = self._action_map[action]
         self.state[source] = dest
 
-        self.tallest_stack = max(map(len, self.stacks))
-
         self.t += 1
 
-        stack_string = self.to_key(self.stacks)
-        if stack_string == self.goal_configuration:
+        state_string = self.to_key(self.state)
+        if state_string == self.goal_configuration:
             self.done = True
 
         truncated = False
@@ -100,30 +97,7 @@ class BlockStackEnv(Env, BaseEnv):
         return self.observation(), self.reward(), self.done, truncated, {}
 
     def render(self):
-        print(self.stacks)
-
-    @property
-    def stacks(self):
-        # Find which blocks are on the table — these are stack bases
-        bases = [b for b in self.blocks if self.state[b] == 'table']
-
-        # Build a reverse map: which block is ON me?
-        on_me = {}  # block -> the block sitting on it
-        for b in self.blocks:
-            if self.state[b] != 'table':
-                on_me[self.state[b]] = b
-
-        # Walk up from each base
-        stacks = []
-        for base in bases:
-            stack = [base]
-            current = base
-            while current in on_me:
-                current = on_me[current]
-                stack.append(current)
-            stacks.append(stack)
-
-        return stacks
+        print(self.to_key(self.state))
 
     def block_is_free(self, block):
         if block != 'table' and block not in self.blocks:
@@ -157,7 +131,6 @@ class BlockStackEnv(Env, BaseEnv):
         backup = BaseEnv.backup(self)
         backup.update({
             'state': self.state.copy(),
-            'tallest_stack': self.tallest_stack,
         })
         return backup
 
@@ -167,7 +140,6 @@ class BlockStackEnv(Env, BaseEnv):
             self.done = checkpoint['done']
             self._la = checkpoint['last_action']
             self.t = checkpoint['t']
-            self.tallest_stack = checkpoint['tallest_stack']
         except KeyError as e:
             print(e)
             return False
@@ -199,8 +171,26 @@ class BlockStackEnv(Env, BaseEnv):
         return self._inverse_action_map[(src, dest)]
 
     @staticmethod
-    def to_key(stacks):
+    def to_key(state):
         # stacks is list[list[str]] from env.stacks (bottom-to-top)
+        stacks = []
+        state_queue = deque(state.items())
+        while state_queue:
+            block, location = state_queue.popleft()
+
+            if location == 'table':
+                stacks.append(block)
+            else:
+                found = False
+                for stack in stacks:
+                    if stack.endswith(location):
+                        stacks.remove(stack)
+                        stack = stack + block
+                        stacks.append(stack)
+                        found = True
+                if not found:
+                    state_queue.append((block, location))
+
         return '|'.join(sorted(''.join(s) for s in stacks))
 
     @staticmethod
