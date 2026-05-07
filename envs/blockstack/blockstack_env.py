@@ -136,7 +136,7 @@ class BlockStackEnv(Env, BaseEnv):
 
     def load(self, checkpoint):
         try:
-            self.state = checkpoint['state']
+            self.state = checkpoint['state'].copy()
             self.done = checkpoint['done']
             self._la = checkpoint['last_action']
             self.t = checkpoint['t']
