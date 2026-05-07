@@ -222,6 +222,20 @@ class BlockStackEnv(Env, BaseEnv):
             x[idx[b], idx[state[b]]] = 1.0
         return x.flatten()
 
+    @staticmethod
+    def input_to_state(inp):
+        n = int((-1 + (1 + 4*len(inp))**.5)/2)
+        idx = {i: b for i, b in enumerate(sorted([chr(ord('a')+i) for i in range(n)]))}
+        idx[n] = 'table'
+
+        state = {}
+        for i in range(n):
+            for j in range(n + 1):
+                if inp[i*(n+1)+j] == 1.0:
+                    state[idx[i]] = idx[j]
+                    break
+        return state
+
 
 
 if __name__ == '__main__':
