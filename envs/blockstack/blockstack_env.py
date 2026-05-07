@@ -87,7 +87,8 @@ class BlockStackEnv(Env, BaseEnv):
 
         self.t += 1
 
-        if len(self.stacks) == 1:
+        stack_string = self.to_key(self.stacks)
+        if stack_string == self.goal_configuration:
             self.done = True
 
         truncated = False
@@ -197,9 +198,22 @@ class BlockStackEnv(Env, BaseEnv):
         return self._inverse_action_map[(src, dest)]
 
     @staticmethod
-    def canonicalize(stacks):
+    def to_key(stacks):
         # stacks is list[list[str]] from env.stacks (bottom-to-top)
         return '|'.join(sorted(''.join(s) for s in stacks))
+
+    @staticmethod
+    def from_key(key):
+        # convert back to dictionary
+        stacks = key.split('|')
+        state = {}
+        for stack in stacks:
+            for i, block in enumerate(stack):
+                if i == 0:
+                    state[block] = 'table'
+                else:
+                    state[block] = stack[i-1]
+        return state
 
 
 
