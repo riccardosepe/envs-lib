@@ -38,6 +38,7 @@ class BlockStackEnv(Env, BaseEnv):
         self.goal_configuration = goal_configuration
         if self.goal_configuration is None:
             self.goal_configuration = "".join(self.blocks)  # e.g. "abcd" for num_blocks=4
+        assert len(self.goal_configuration) == self.num_blocks
 
     @staticmethod
     def _bell_number(n):
