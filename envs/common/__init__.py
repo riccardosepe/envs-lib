@@ -1,1 +1,1 @@
-from .base_env import BaseEnv
+from .base_env import BaseEnv, EnvStepException
