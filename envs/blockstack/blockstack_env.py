@@ -18,7 +18,7 @@ class BlockStackEnv(Env, BaseEnv):
     """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, num_blocks=4, *args, **kwargs):
+    def __init__(self, num_blocks=4, goal_configuration=None, *args, **kwargs):
         super().__init__()
         assert num_blocks >= 2, "There must be at least 2 blocks to stack."
         self.num_blocks = num_blocks
@@ -35,6 +35,9 @@ class BlockStackEnv(Env, BaseEnv):
         self._build_action_map()
         self._la = None
         self._block_value = 1 / num_blocks
+        self.goal_configuration = goal_configuration
+        if self.goal_configuration is None:
+            self.goal_configuration = "".join(self.blocks)  # e.g. "abcd" for num_blocks=4
 
     @staticmethod
     def _bell_number(n):
