@@ -1,5 +1,5 @@
-import math
 from collections import deque
+from functools import lru_cache
 
 import numpy as np
 from gymnasium import Env, spaces
@@ -27,7 +27,7 @@ class BlockStackEnv(Env, BaseEnv):
         self.state = None
         self.done = False
         self.t = None
-        self.state_space = spaces.Discrete(self._bell_number(num_blocks))
+        self.state_space = spaces.Discrete(self._oeis_a000262(num_blocks))
         self.action_space = spaces.Discrete(num_blocks**2)
         self._max_episode_length = 4*num_blocks
         self._action_map = None
@@ -41,11 +41,15 @@ class BlockStackEnv(Env, BaseEnv):
         assert len(self.goal_configuration) == self.num_blocks
 
     @staticmethod
-    def _bell_number(n):
-        if n == 0:
+    @lru_cache(maxsize=None)
+    def _oeis_a000262(n):
+        """
+        Number of sets of lists from Online Encyclopedia of Integer Sequences (OEIS) A000262.
+        """
+        if n <= 1:
             return 1
-        else:
-            return sum(BlockStackEnv._bell_number(k) * math.comb(n-1, k) for k in range(n))
+        return (2 * n - 1) * BlockStackEnv._oeis_a000262(n - 1) \
+            - (n - 1) * (n - 2) * BlockStackEnv._oeis_a000262(n - 2)
 
     def _build_action_map(self):
         if self._action_map is not None:
