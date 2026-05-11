@@ -35,11 +35,11 @@ class BlockStackEnv(Env, BaseEnv):
         self._build_action_map()
         self._la = None
         self._block_value = 1 / num_blocks
-        self.goal_configuration = goal_configuration
-        if self.goal_configuration is None:
-            self.goal_configuration = "".join(self.blocks)  # e.g. "abcd" for num_blocks=4
-        assert len(self.goal_configuration) == self.num_blocks
-        self._goal_support = self.from_key(self.goal_configuration)
+        self._goal_key = goal_configuration
+        if self._goal_key is None:
+            self._goal_key = "".join(self.blocks)  # e.g. "abcd" for num_blocks=4
+        assert len(self._goal_key) == self.num_blocks
+        self.goal_configuration = self.from_key(self._goal_key)
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -89,7 +89,7 @@ class BlockStackEnv(Env, BaseEnv):
 
         self.t += 1
 
-        if np.array_equal(self._support, self._goal_support):
+        if np.array_equal(self._support, self.goal_configuration):
             self.done = True
 
         truncated = False
