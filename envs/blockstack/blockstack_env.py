@@ -1,4 +1,3 @@
-from collections import deque
 from functools import lru_cache
 
 import numpy as np
@@ -23,13 +22,14 @@ class BlockStackEnv(Env, BaseEnv):
         super().__init__()
         assert num_blocks >= 2, "There must be at least 2 blocks to stack."
         self.num_blocks = num_blocks
-        self.blocks = [chr(ord('a')+i) for i in range(num_blocks)]
-        self.state = None
+        self.blocks = [chr(ord('a') + i) for i in range(num_blocks)]
+        self._blocks_indices = {b: i for i, b in enumerate(self.blocks)}
+        self._support = None
         self.done = False
         self.t = None
         self.state_space = spaces.Discrete(self._oeis_a000262(num_blocks))
-        self.action_space = spaces.Discrete(num_blocks**2)
-        self._max_episode_length = 4*num_blocks
+        self.action_space = spaces.Discrete(num_blocks ** 2)
+        self._max_episode_length = 4 * num_blocks
         self._action_map = None
         self._inverse_action_map = None
         self._build_action_map()
@@ -39,6 +39,7 @@ class BlockStackEnv(Env, BaseEnv):
         if self.goal_configuration is None:
             self.goal_configuration = "".join(self.blocks)  # e.g. "abcd" for num_blocks=4
         assert len(self.goal_configuration) == self.num_blocks
+        self._goal_support = self.from_key(self.goal_configuration)
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -57,40 +58,38 @@ class BlockStackEnv(Env, BaseEnv):
         self._action_map = dict()
         self._inverse_action_map = dict()
         idx = 0
-        for source in self.blocks:
-            for dest in self.blocks:
-                if source != dest:
-                    self._action_map[idx] = (source, dest)
-                    self._inverse_action_map[(source, dest)] = idx
+        for source_idx in range(self.num_blocks):
+            for dest_idx in range(self.num_blocks):
+                if source_idx != dest_idx:
+                    self._action_map[idx] = (source_idx, dest_idx)
+                    self._inverse_action_map[(source_idx, dest_idx)] = idx
                     idx += 1
 
-            self._action_map[idx] = (source, 'table')
-            self._inverse_action_map[(source, 'table')] = idx
+            self._action_map[idx] = (source_idx, self.num_blocks)
+            self._inverse_action_map[(source_idx, self.num_blocks)] = idx
             idx += 1
-
 
     def reset(self, *args, **kwargs):
         # Initial state: all blocks on the table
-        self.state = {block: 'table' for block in self.blocks}
+        self._support = self.num_blocks * np.ones(self.num_blocks, dtype=int)
         self.done = False
         self._la = None
         self.t = 0
         return self.observation(), {}
 
     def observation(self):
-        return self.state.copy()
+        return self._support.copy()
 
     def step(self, action):
         if action not in self.legal_actions:
             raise EnvStepException
 
-        source, dest = self._action_map[action]
-        self.state[source] = dest
+        source_idx, dest_idx = self._action_map[action]
+        self._support[source_idx] = dest_idx
 
         self.t += 1
 
-        state_string = self.to_key(self.state)
-        if state_string == self.goal_configuration:
+        if np.array_equal(self._support, self._goal_support):
             self.done = True
 
         truncated = False
@@ -101,24 +100,21 @@ class BlockStackEnv(Env, BaseEnv):
         return self.observation(), self.reward(), self.done, truncated, {}
 
     def render(self):
-        print(self.to_key(self.state))
+        print(self.to_key(self._support))
 
-    def block_is_free(self, block):
-        if block != 'table' and block not in self.blocks:
-            raise ValueError
-        for b, on in self.state.items():
-            if on == block:
-                return False
-        return True
+    def block_is_free(self, block_idx):
+        if block_idx == self.num_blocks:
+            return True
+        return not np.any(self._support == block_idx)
 
     @property
     def legal_actions(self):
         legal = []
-        for i, (source, dest) in self._action_map.items():
-            if not self.block_is_free(source) or dest == self.state[source]:
+        for i, (source_idx, dest_idx) in self._action_map.items():
+            if not self.block_is_free(source_idx) or dest_idx == self._support[source_idx]:
                 continue
             else:
-                if self.block_is_free(dest) or dest == 'table':
+                if self.block_is_free(dest_idx) or dest_idx == self.num_blocks:
                     legal.append(i)
 
         return legal
@@ -134,13 +130,13 @@ class BlockStackEnv(Env, BaseEnv):
     def backup(self):
         backup = BaseEnv.backup(self)
         backup.update({
-            'state': self.state.copy(),
+            'state': self._support.copy(),
         })
         return backup
 
     def load(self, checkpoint):
         try:
-            self.state = checkpoint['state'].copy()
+            self._support = checkpoint['state'].copy()
             self.done = checkpoint['done']
             self._la = checkpoint['last_action']
             self.t = checkpoint['t']
@@ -170,72 +166,65 @@ class BlockStackEnv(Env, BaseEnv):
     def max_episode_length(self):
         return self._max_episode_length
 
-    def get_action_id(self, src, dest):
+    def get_action_id(self, source, dest):
         # OBS: there is a 1:1 mapping between keys and values
-        return self._inverse_action_map[(src, dest)]
+        if source == dest:
+            return -1
+        source_idx = ord(source) - ord('a')
+        if dest == 'table':
+            dest_idx = self.num_blocks
+        else:
+            dest_idx = ord(dest) - ord('a')
+        return self._inverse_action_map[(source_idx, dest_idx)]
 
     @staticmethod
-    def to_key(state):
-        # stacks is list[list[str]] from env.stacks (bottom-to-top)
+    def to_key(support):
+        num_blocks = len(support)
+        blocks = [chr(i + ord('a')) for i in range(len(support))]
+        free_blocks_idxs = list(set(range(num_blocks)) - set(support))
         stacks = []
-        state_queue = deque(state.items())
-        while state_queue:
-            block, location = state_queue.popleft()
 
-            if location == 'table':
-                stacks.append(block)
-            else:
-                found = False
-                for stack in stacks:
-                    if stack.endswith(location):
-                        stacks.remove(stack)
-                        stack = stack + block
-                        stacks.append(stack)
-                        found = True
-                if not found:
-                    state_queue.append((block, location))
+        for fb in free_blocks_idxs:
+            stack = [fb]
+            x = fb
+            while True:
+                y = support[x]
+                stack.append(y)
 
-        return '|'.join(sorted(''.join(s) for s in stacks))
+                if y == num_blocks:
+                    break
+                x = y
+            stacks.append(''.join(blocks[i] for i in reversed(stack[:-1])))
+        return '|'.join(sorted(stacks))
 
     @staticmethod
     def from_key(key):
         # convert back to dictionary
         stacks = key.split('|')
-        state = {}
+        num_blocks = sum([len(s) for s in stacks])
+        support = np.zeros(num_blocks, dtype=int)
         for stack in stacks:
             for i, block in enumerate(stack):
+                block_idx = ord(block) - ord('a')
                 if i == 0:
-                    state[block] = 'table'
+                    support[block_idx] = num_blocks
                 else:
-                    state[block] = stack[i-1]
-        return state
+                    support[block_idx] = ord(stack[i - 1]) - ord('a')
+        return support
 
     @staticmethod
-    def state_to_input(state):
-        blocks = list(sorted(state.keys()))
-        n = len(blocks)
-        idx = {b: i for i, b in enumerate(blocks)}
-        idx['table'] = n
+    def encode(support):
+        n = len(support)
 
         x = np.zeros((n, n + 1), dtype=np.float32)
-        for b in blocks:
-            x[idx[b], idx[state[b]]] = 1.0
+        x[np.arange(n), support] = 1.0
         return x.flatten()
 
     @staticmethod
-    def input_to_state(inp):
-        n = int((-1 + (1 + 4*len(inp))**.5)/2)
-        idx = {i: b for i, b in enumerate(sorted([chr(ord('a')+i) for i in range(n)]))}
-        idx[n] = 'table'
-
-        state = {}
-        for i in range(n):
-            for j in range(n + 1):
-                if inp[i*(n+1)+j] == 1.0:
-                    state[idx[i]] = idx[j]
-                    break
-        return state
-
+    def decode(inp):
+        support = np.where(inp == 1)[1]
+        assert len(support) == inp.shape[0]
+        return support
 
 
 if __name__ == '__main__':
@@ -247,15 +236,15 @@ if __name__ == '__main__':
     done = False
     while not done:
         src = input('Enter source block: ')
-        dest = input('Enter destination block: ')
+        dst = input('Enter destination block: ')
 
-        act_id = env.get_action_id(src, dest)
+        act_id = env.get_action_id(src, dst)
         while act_id not in env.legal_actions:
             print('Invalid action')
             src = input('Enter source block: ')
-            dest = input('Enter destination block: ')
+            dst = input('Enter destination block: ')
 
-            act_id = env.get_action_id(src, dest)
+            act_id = env.get_action_id(src, dst)
 
         obs, reward, done, truncated, _ = env.step(act_id)
         env.render()
