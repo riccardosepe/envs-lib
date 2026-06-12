@@ -304,21 +304,27 @@ class SailingDomainEnv(Env, BaseEnv):
         except KeyError as e:
             raise RuntimeError("Invalid checkpoint format") from e
 
+    def build_board(self):
+        board = np.array([['.' for _ in range(self.cols)] for _ in range(self.rows)], dtype="c")
+        for (r, c) in self.obstacles:
+            board[r, c] = '@'
+        for (r, c) in self.treasures_a:
+            if not self._taken_treasures[(r, c)]:
+                board[r, c] = 'A'
+        for (r, c) in self.treasures_b:
+            if not self._taken_treasures[(r, c)]:
+                board[r, c] = 'B'
+        board[self.goal_pos[0], self.goal_pos[1]] = 'G'
+        board[self.state[0], self.state[1]] = 'R'  # Robot position
+        board[self.start_pos[0], self.start_pos[1]] = 'S'  # Start position
+        return board
+
     def render(self):
         if self.state is None:
             print("Environment not initialized. Call reset() first.")
             return
 
-        board = np.array([['.' for _ in range(self.cols)] for _ in range(self.rows)], dtype="c")
-        for (r, c) in self.obstacles:
-            board[r, c] = '@'
-        for (r, c) in self.treasures_a:
-            board[r, c] = 'A'
-        for (r, c) in self.treasures_b:
-            board[r, c] = 'B'
-        board[self.goal_pos[0], self.goal_pos[1]] = 'G'
-        board[self.state[0], self.state[1]] = 'R'  # Robot position
-        board[self.start_pos[0], self.start_pos[1]] = 'S'  # Start position
+        board = self.build_board()
 
         if self.render_mode == 'ansi':
             # Print the board
@@ -448,9 +454,9 @@ class SailingDomainEnv(Env, BaseEnv):
                     self.window_surface.blit(self.whirl_img, pos)
                 elif desc[y][x] == b"S":
                     self.window_surface.blit(self.start_img, pos)
-                elif desc[y][x] == b"A" and not self._taken_treasures[(y, x)]:
+                elif desc[y][x] == b"A":
                     self.window_surface.blit(self.chest_A_img, pos)
-                elif desc[y][x] == b"B" and not self._taken_treasures[(y, x)]:
+                elif desc[y][x] == b"B":
                     self.window_surface.blit(self.chest_B_img, pos)
                 elif x == self.cols-1:
                     if desc[y][x] == b"G":
