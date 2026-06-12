@@ -331,7 +331,7 @@ class SailingDomainEnv(Env, BaseEnv):
             print(self._render_text(board))
 
         elif self.render_mode == 'human':
-            return self._render_gui(self.desc, self.render_mode)
+            return self._render_gui(board, self.render_mode)
 
     def _render_text(self, board):
         desc = board.tolist()
@@ -450,7 +450,7 @@ class SailingDomainEnv(Env, BaseEnv):
                 self.window_surface.blit(self.water_img[x%3], pos)
                 if x == y == 0:
                     self.window_surface.blit(self.wind_img, pos)
-                if desc[y][x] == b"@":
+                if self.desc[y][x] == b"@":
                     self.window_surface.blit(self.whirl_img, pos)
                 elif desc[y][x] == b"S":
                     self.window_surface.blit(self.start_img, pos)
