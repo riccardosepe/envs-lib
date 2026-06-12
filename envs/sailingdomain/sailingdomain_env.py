@@ -118,7 +118,7 @@ class SailingDomainEnv(Env, BaseEnv):
         # Map elements
         self._setup_map(map_name)
 
-        self._obstacle_reward = -0.1
+        self._obstacle_reward = -0.25
         self._goal_reward = 0.4
         self._non_goal_reward = 0.0
         self._a_reward = 0.3
