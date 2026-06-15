@@ -118,7 +118,7 @@ class SailingDomainEnv(Env, BaseEnv):
         # Map elements
         self._setup_map(map_name)
 
-        self._obstacle_reward = -0.1
+        self._obstacle_reward = -0.25
         self._goal_reward = 0.4
         self._non_goal_reward = 0.0
         self._a_reward = 0.3
@@ -381,28 +381,34 @@ class SailingDomainEnv(Env, BaseEnv):
     # Rendering
     # ------------------------------------------------------------------
 
+    def build_board(self):
+        board = np.array([['.' for _ in range(self.cols)] for _ in range(self.rows)], dtype="c")
+        for (r, c) in self.obstacles:
+            board[r, c] = '@'
+        for (r, c) in self.treasures_a:
+            if not self._taken_treasures[(r, c)]:
+                board[r, c] = 'A'
+        for (r, c) in self.treasures_b:
+            if not self._taken_treasures[(r, c)]:
+                board[r, c] = 'B'
+        board[self.goal_pos[0], self.goal_pos[1]] = 'G'
+        board[self.state[0], self.state[1]] = 'R'  # Robot position
+        board[self.start_pos[0], self.start_pos[1]] = 'S'  # Start position
+        return board
+
     def render(self):
         if self.state is None:
             print("Environment not initialized. Call reset() first.")
             return
 
-        board = np.array([['.' for _ in range(self.cols)] for _ in range(self.rows)], dtype="c")
-        for (r, c) in self.obstacles:
-            board[r, c] = '@'
-        for (r, c) in self.treasures_a:
-            board[r, c] = 'A'
-        for (r, c) in self.treasures_b:
-            board[r, c] = 'B'
-        board[self.goal_pos[0], self.goal_pos[1]] = 'G'
-        board[self.state[0], self.state[1]] = 'R'  # Robot position
-        board[self.start_pos[0], self.start_pos[1]] = 'S'  # Start position
+        board = self.build_board()
 
         if self.render_mode == 'ansi':
             # Print the board
             print(self._render_text(board))
 
         elif self.render_mode == 'human':
-            return self._render_gui(self.desc, self.render_mode)
+            return self._render_gui(board, self.render_mode)
 
     def _render_text(self, board):
         desc = board.tolist()
@@ -521,13 +527,13 @@ class SailingDomainEnv(Env, BaseEnv):
                 self.window_surface.blit(self.water_img[x % 3], pos)
                 if x == y == 0:
                     self.window_surface.blit(self.wind_img, pos)
-                if desc[y][x] == b"@":
+                if self.desc[y][x] == b"@":
                     self.window_surface.blit(self.whirl_img, pos)
                 elif desc[y][x] == b"S":
                     self.window_surface.blit(self.start_img, pos)
-                elif desc[y][x] == b"A" and not self._taken_treasures[(y, x)]:
+                elif desc[y][x] == b"A":
                     self.window_surface.blit(self.chest_A_img, pos)
-                elif desc[y][x] == b"B" and not self._taken_treasures[(y, x)]:
+                elif desc[y][x] == b"B":
                     self.window_surface.blit(self.chest_B_img, pos)
                 elif x == self.cols - 1:
                     if desc[y][x] == b"G":
