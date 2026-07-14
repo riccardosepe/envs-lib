@@ -88,7 +88,7 @@ class BreakthroughEnv(BaseEnv, Env):
         self.render_mode = kwargs.pop('render_mode', None)
 
     def __copy__(self):
-        new_env = BreakthroughEnv(max_episode_length=self.max_episode_length, render_mode=self.render_mode)
+        new_env = type(self)(max_episode_length=self.max_episode_length, render_mode=self.render_mode)
         new_env.board = deepcopy(self.board)
         new_env._done = self._done
         new_env.current_player = self.current_player
@@ -454,14 +454,9 @@ class BreakthroughEnv(BaseEnv, Env):
         self.board[i, j] = EMPTY_CELL
         self.board[ii, jj] = self.current_player
 
-        if self.current_player == WHITE and ii == 0:
-            self._done = WHITE
-        elif self.current_player == BLACK and ii == self.nrow - 1:
-            self._done = BLACK
-        elif len(list(filter(lambda p: p is not None, self._pieces_positions[WHITE].values()))) == 0:
-            self._done = BLACK
-        elif len(list(filter(lambda p: p is not None, self._pieces_positions[BLACK].values()))) == 0:
-            self._done = WHITE
+        winner = self._winner(mover=self.current_player, dest_row=ii)
+        if winner is not None:
+            self._done = winner
 
         self.current_player = self.other_player
 
@@ -470,6 +465,25 @@ class BreakthroughEnv(BaseEnv, Env):
         self._la = action
 
         return self.observation, self.reward(), self.done, truncated, info
+
+    def _winner(self, mover, dest_row):
+        """
+        Determine the winner after ``mover`` has just moved a piece to row
+        ``dest_row``. Returns WHITE or BLACK if the game is over, else None.
+
+        Standard Breakthrough: a player wins by reaching the opponent's
+        baseline, or when the opponent has no pieces left. Variants that only
+        change the terminal condition should override this method.
+        """
+        if mover == WHITE and dest_row == 0:
+            return WHITE
+        elif mover == BLACK and dest_row == self.nrow - 1:
+            return BLACK
+        elif len(list(filter(lambda p: p is not None, self._pieces_positions[WHITE].values()))) == 0:
+            return BLACK
+        elif len(list(filter(lambda p: p is not None, self._pieces_positions[BLACK].values()))) == 0:
+            return WHITE
+        return None
 
     def legal_actions_board(self, board, player):
         """

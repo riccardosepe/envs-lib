@@ -13,6 +13,7 @@ _EXPORTS = {
     "BarterGameEnv": ".bartergame.bartergame_env",
     "BlockStackEnv": ".blockstack.blockstack_env",
     "BreakthroughEnv": ".breakthrough.breakthrough_env",
+    "VectorBreakthroughEnv": ".breakthrough.vector_breakthrough_env",
     "CliffWorldEnv": ".cliffworld.cliffworld_env",
     "Connect4Env": ".connect4.connect4_env",
     "FrozenLakeEnv": ".frozenlake.frozenlake_env",
