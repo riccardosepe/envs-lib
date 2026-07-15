@@ -56,11 +56,21 @@ class VectorBreakthroughEnv(BreakthroughEnv):
             if white_score > black_score:
                 return WHITE
             elif white_score == black_score:
-                return EMPTY_CELL
+                return DRAW
             else:
                 return BLACK
         else:
             return None
+
+    def reward(self):
+        if self.done == DRAW:
+            return 0
+        return super().reward()
+
+    def game_result(self, human_readable=False):
+        if self.done == DRAW:
+            return "It's a draw!" if human_readable else 0
+        return super().game_result(human_readable=human_readable)
 
     # Note: BreakthroughEnv.board_is_terminal (a @staticmethod returning just a
     # bool) has no callers in this codebase, so it is intentionally not
