@@ -505,7 +505,7 @@ class BreakthroughEnv(BaseEnv, Env):
                         dest_cell = board[ii, jj]
                         if d_j == 0 and dest_cell == 0:
                             la.append(self._encode_action(i, j, direction))
-                        elif d_j != 0 and dest_cell != self.current_player:
+                        elif d_j != 0 and dest_cell != player:
                             la.append(self._encode_action(i, j, direction))
 
         return la
