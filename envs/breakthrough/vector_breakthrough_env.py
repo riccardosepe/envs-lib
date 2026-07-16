@@ -29,8 +29,8 @@ class VectorBreakthroughEnv(BreakthroughEnv):
     def reset(self, **kwargs):
         super().reset(**kwargs)
         self.board = np.zeros((self.nrow, self.ncol), dtype=np.uint8)
-        self.board[1:2, :] = BLACK
-        self.board[-5:-4, :] = WHITE
+        self.board[2:4, :] = BLACK
+        self.board[4:6, :] = WHITE
         self._pieces_positions = {WHITE: dict(), BLACK: dict()}
 
         for i in range(self.nrow):
