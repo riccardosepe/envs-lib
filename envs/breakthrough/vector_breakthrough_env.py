@@ -40,6 +40,21 @@ class VectorBreakthroughEnv(BreakthroughEnv):
                     continue
                 self._pieces_positions[piece][len(self._pieces_positions[piece])] = (i, j)
 
+    def _positional_scores(self):
+        """Each colour's advancement score: its pieces weighted by their **row**'s ``_scores`` value.
+
+        The weight is measured from each colour's own goal side: white advances toward row 0, so its
+        pieces are weighted by ``_scores`` (row 0 highest); black advances toward the last row, so its
+        pieces are weighted by ``_scores`` reversed. Counting per row first (``sum(axis=1)``) and
+        taking a dot product makes the *row*-weighting explicit — the previous ``board * _scores``
+        broadcast weighted by *column*. Returns ``(white_score, black_score)`` as Python ints.
+        """
+        white_per_row = (self.board == WHITE).sum(axis=1)  # (nrow,) white pieces in each row
+        black_per_row = (self.board == BLACK).sum(axis=1)
+        white_score = int(self._scores @ white_per_row)        # weighted from white's goal (row 0)
+        black_score = int(self._scores[::-1] @ black_per_row)  # black's goal is the last row
+        return white_score, black_score
+
     def _winner(self, mover, dest_row):
         """
         Determine the winner after ``mover`` moved a piece to row ``dest_row``.
@@ -50,9 +65,7 @@ class VectorBreakthroughEnv(BreakthroughEnv):
         condition needs more than ``mover`` and ``dest_row``.
         """
         if not self.legal_actions_board(self.board, self.other_player):
-            # NB: the default representation of a board is white below, black above
-            white_score = (np.where(self.board == WHITE, 1, 0) * self._scores).sum()
-            black_score = (np.where(self.board == BLACK, 1, 0) * self._scores[::-1]).sum()
+            white_score, black_score = self._positional_scores()
             if white_score > black_score:
                 return WHITE
             elif white_score == black_score:
@@ -70,7 +83,7 @@ class VectorBreakthroughEnv(BreakthroughEnv):
         of this length). Set it to however many objectives your reward will
         decompose into.
         """
-        return 2
+        return 1
 
     def reward(self):
         """Vector reward for the last transition.
@@ -87,14 +100,11 @@ class VectorBreakthroughEnv(BreakthroughEnv):
         if not self.done:
             return np.zeros(self.reward_space_cardinality)
 
-        white_score_1 = np.count_nonzero(self.board[0] == WHITE)
-        white_score_2 = np.count_nonzero(self.board[1] == WHITE)
-        black_score_1 = np.count_nonzero(self.board[-1] == BLACK)
-        black_score_2 = np.count_nonzero(self.board[-2] == BLACK)
-        reward_vector = np.array([white_score_1 - black_score_1, white_score_2 - black_score_2])
+        white_score, black_score = self._positional_scores()
+        r = white_score - black_score
         if self.current_player == BLACK:
-            reward_vector = -reward_vector
-        return reward_vector
+            r = -r
+        return np.full(self.reward_space_cardinality, r, dtype=float)
 
     def game_result(self, human_readable=False):
         if self.done == DRAW:
