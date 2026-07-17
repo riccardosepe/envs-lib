@@ -24,13 +24,22 @@ class VectorBreakthroughEnv(BreakthroughEnv):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._scores = np.array([2, 1, 0, 0, 0, 0, 0, 0])
+        # The two ranks nearest each colour's goal score 2 and 1; all deeper rows score 0. Length
+        # must equal nrow so ``_positional_scores`` can dot it against the per-row piece counts.
+        # Non-square boards vary ncol (pieces per rank) freely; nrow only sets this vector's length.
+        assert self.nrow % 2 == 0 and self.nrow >= 6, \
+            f"VectorBreakthrough needs an even nrow >= 6 for a symmetric centred start, got {self.nrow}"
+        self._scores = np.array([2, 1] + [0] * (self.nrow - 2))
 
     def reset(self, **kwargs):
         super().reset(**kwargs)
         self.board = np.zeros((self.nrow, self.ncol), dtype=np.uint8)
-        self.board[2:4, :] = BLACK
-        self.board[4:6, :] = WHITE
+        # Two ranks per side, packed symmetrically around the middle: BLACK just above centre,
+        # WHITE just below (nrow=8 -> BLACK rows 2-3, WHITE rows 4-5). The empty rows above/below
+        # are the goal ranks each side races toward.
+        mid = self.nrow // 2
+        self.board[mid - 2:mid, :] = BLACK
+        self.board[mid:mid + 2, :] = WHITE
         self._pieces_positions = {WHITE: dict(), BLACK: dict()}
 
         for i in range(self.nrow):
