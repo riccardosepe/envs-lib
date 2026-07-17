@@ -49,8 +49,13 @@ class BreakthroughEnv(BaseEnv, Env):
     DARK_COLOR = (119, 136, 153)
     HIGHLIGHT_COLOR = (0, 255, 0)
 
-    def __init__(self, max_episode_length=None, **kwargs):
-        self.ncol = self.nrow = 8
+    def __init__(self, max_episode_length=None, nrow=8, ncol=8, **kwargs):
+        # Board size is parametric and may be non-square. Everything below derives from
+        # nrow/ncol; the only hard requirement is enough rows for the two starting ranks per
+        # side (top two + bottom two) not to overlap.
+        assert nrow >= 4 and ncol >= 2, f"Board must be at least 4x2, got {nrow}x{ncol}"
+        self.nrow = nrow
+        self.ncol = ncol
         self.action_space = spaces.Discrete(self.ncol * self.nrow * 3)
         self.observation_space = spaces.Box(low=0, high=2, shape=(self.nrow, self.ncol), dtype=np.uint8)
         self.board = None
@@ -88,7 +93,8 @@ class BreakthroughEnv(BaseEnv, Env):
         self.render_mode = kwargs.pop('render_mode', None)
 
     def __copy__(self):
-        new_env = type(self)(max_episode_length=self.max_episode_length, render_mode=self.render_mode)
+        new_env = type(self)(max_episode_length=self.max_episode_length, nrow=self.nrow, ncol=self.ncol,
+                             render_mode=self.render_mode)
         new_env.board = deepcopy(self.board)
         new_env._done = self._done
         new_env.current_player = self.current_player
@@ -399,8 +405,12 @@ class BreakthroughEnv(BaseEnv, Env):
 
         ckpt['board'] = board
 
+        # Preallocate one None slot per cell (an upper bound on pieces per side, board-size
+        # agnostic); the sequential fill below only uses as many as there are pieces, and the
+        # trailing None slots read as "absent" everywhere they are consumed.
+        max_pieces = board.shape[0] * board.shape[1]
         state = (
-            {WHITE: {i: None for i in range(16)}, BLACK: {i: None for i in range(16)}},
+            {WHITE: {i: None for i in range(max_pieces)}, BLACK: {i: None for i in range(max_pieces)}},
             current_player
         )
 
